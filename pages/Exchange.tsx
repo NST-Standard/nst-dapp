@@ -113,6 +113,7 @@ const Exchange = ({ inventory, totalSupply, address, contracts }: Props) => {
         <Box maxW="20%">
           <Text>Give:</Text>
           <Select
+            multiple={true}
             value={[
               simpleExchange.bid.tokenAddr,
               simpleExchange.bid.tokenId.toString(),
@@ -151,6 +152,7 @@ const Exchange = ({ inventory, totalSupply, address, contracts }: Props) => {
         <Box maxW="20%">
           <Text>Ask:</Text>
           <Select
+            multiple={true}
             value={[
               simpleExchange.ask.tokenAddr,
               simpleExchange.ask.tokenId.toString(),
