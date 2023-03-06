@@ -1,137 +1,34 @@
 import Head from "next/head"
-import {
-  Box,
-  Button,
-  Card,
-  CardBody,
-  Container,
-  Heading,
-  Select,
-  Spinner,
-  Text,
-} from "@chakra-ui/react"
+import { Box, Container, Heading } from "@chakra-ui/react"
 import jsonContracts from "./contracts.json"
 
-import { useAccount, useConnect, useDisconnect } from "wagmi"
-import { MetaMaskConnector } from "@wagmi/core/connectors/metaMask"
+import { useAccount } from "wagmi"
+
 import { getContract } from "@wagmi/core"
 import { useEffect, useState } from "react"
 import { fetchSigner } from "@wagmi/core"
-import { Contract, Event as EtherEvent } from "ethers"
-import Image from "next/image"
-
-type Contracts = {
-  smokeBond: null | Contract
-  supportTicket: null | Contract
-  gardenTicket: null | Contract
-}
-
-interface OwnedToken {
-  tokens: EtherEvent[]
-  metadata: URIs
-}
-
-type URIs = {
-  title: string
-  description: string
-  image: string
-}
-
-const fetchWithTimeout = async (
-  ressource: RequestInfo,
-  options = { timeout: 8000 }
-) => {
-  const controller = new AbortController()
-  const id = setTimeout(() => controller.abort(), options.timeout)
-
-  const response = await fetch(ressource, {
-    ...options,
-    signal: controller.signal,
-  })
-  clearTimeout(id)
-
-  return response
-}
-
-const contractName = (contractAddr: string): string => {
-  switch (contractAddr.toLowerCase()) {
-    case "0xbecced78b7a65a0b2464869553fc0a3c2d2db935":
-      return "Smoke Bond"
-    case "0x1ddd12d738acf870de92fd5387d90f3733d50d94":
-      return "Support ticket"
-    case "0x1a48b20bd0f0c89f823686c2270c5404887c287c":
-      return "Garden ticket"
-    default:
-      return "Unknown contract"
-  }
-}
-
-const fetchToken = async (
-  contract: Contract,
-  address: string
-): Promise<OwnedToken> => {
-  const transferFilter = contract.filters.Transfer(
-    null, // from
-    address // to
-  )
-  const tokens = await contract.queryFilter(transferFilter)
-  const metadata = await fetchMetadata(contract)
-
-  return { tokens, metadata }
-}
-
-const fetchMetadata = async (contract: Contract): Promise<URIs> => {
-  const gateway = "https://ipfs.io/ipfs/"
-  let ipfsHash = ""
-  const [uri] = await contract.functions.tokenURI(0)
-  ipfsHash = uri.slice(uri.indexOf("Qm"))
-
-  // fetch metadata
-  let data
-  try {
-    data = await fetchWithTimeout(gateway + ipfsHash, { timeout: 3000 })
-  } catch (e: any) {
-    return {
-      title: "",
-      description: "",
-      image: `Failed to load metadata, IPFS hash: ${ipfsHash}`,
-    }
-  }
-
-  // fetch image
-  const json = await data.json() // metadata
-  ipfsHash = json.image.slice(json.image.indexOf("Qm"))
-  let imgData
-  try {
-    imgData = await fetchWithTimeout(gateway + ipfsHash, { timeout: 3000 })
-  } catch (e: any) {
-    return {
-      title: json.title,
-      description: json.description,
-      image: `Failed to load image, IPFS hash: ${ipfsHash}`,
-    }
-  }
-
-  const blob = await imgData.blob()
-  const src = URL.createObjectURL(blob)
-
-  return {
-    title: json.name,
-    description: json.description,
-    image: src,
-  }
-}
+import { Event as EtherEvent } from "ethers"
+import {
+  Collection,
+  Contracts,
+  fetchCollections,
+  fetchToken,
+} from "@/lib/tokenInventory"
+import Account from "./Account"
+import Inventory from "./Inventory"
+import Mint from "./Mint"
+import Exchange from "./Exchange"
 
 const Home = () => {
   const { address, isConnected } = useAccount()
-  const { connect } = useConnect({ connector: new MetaMaskConnector() })
-  const { disconnect } = useDisconnect()
 
   const [contracts, setContracts] = useState({} as Contracts)
   const { smokeBond, supportTicket, gardenTicket } = contracts
-  const [inventory, setInventory] = useState<OwnedToken[]>([])
 
-  // FETCH CONTRACT
+  const [totalSupply, setTotalSupply] = useState<EtherEvent[]>([])
+  const [inventory, setInventory] = useState<Collection[]>([])
+
+  // FETCH CONTRACT and Tokens
   useEffect(() => {
     ;(async () => {
       const signer = await fetchSigner()
@@ -157,6 +54,7 @@ const Home = () => {
         })
 
         setContracts(_contracts)
+        setTotalSupply(await fetchCollections(_contracts))
       }
     })()
   }, [isConnected])
@@ -165,7 +63,7 @@ const Home = () => {
   useEffect(() => {
     ;(async () => {
       if (smokeBond && supportTicket && gardenTicket && address) {
-        const inventory: OwnedToken[] = []
+        const inventory: Collection[] = []
         inventory.push(await fetchToken(supportTicket, address))
         inventory.push(await fetchToken(gardenTicket, address))
         inventory.push(await fetchToken(smokeBond, address))
@@ -173,22 +71,6 @@ const Home = () => {
       }
     })()
   }, [smokeBond, supportTicket, gardenTicket, address])
-
-  async function mint(contract: Contract) {
-    let tx
-    console.log("waiting for confirmation")
-    try {
-      tx = await contract["mint(address)"](address)
-    } catch (e) {
-      console.log(e)
-      return
-    }
-
-    console.log("pending")
-    let result = await tx.wait()
-
-    console.log(result)
-  }
 
   return (
     <>
@@ -209,153 +91,23 @@ const Home = () => {
           </Heading>
 
           {/* ACCOUNT */}
-          <Heading py="5" fontFamily="monospace" as="h2">
-            Account details
-          </Heading>
-          {isConnected ? (
-            <>
-              <Text>Connected with {address}</Text>
-              <Button onClick={() => disconnect()} colorScheme="twitter">
-                Disconnect
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button onClick={() => connect()} colorScheme="twitter">
-                Connect wallet
-              </Button>
-            </>
-          )}
+          <Account />
 
           {/* NST BALANCES */}
-          <Heading py="5" as="h2" fontFamily="monospace">
-            NSTs balances
-          </Heading>
-          {inventory.length === 0 ? (
-            <>
-              <Spinner />
-            </>
-          ) : (
-            <></>
-          )}
-          <Box display="flex" gap="5">
-            {inventory.map((nst: OwnedToken) => {
-              return nst.tokens.map((token: EtherEvent) => {
-                if (token.args) {
-                  return (
-                    <Card
-                      maxW="20%"
-                      key={token.address + token.args[2].toNumber()}
-                    >
-                      <CardBody display="flex" flexDirection="column">
-                        <Text fontSize="1rem" fontWeight="bold">
-                          {contractName(token.address)}
-                        </Text>
-                        {nst.metadata.image.startsWith("Failed") ? (
-                          <>
-                            <Text>{nst.metadata.image}</Text>
-                          </>
-                        ) : (
-                          <>
-                            <Image
-                              alt={nst.metadata.description}
-                              src={nst.metadata.image}
-                              width="200"
-                              height="200"
-                            />
-                          </>
-                        )}
-                        {token.args ? (
-                          <Text fontWeight="bold" mt="auto">
-                            TokenId: {token.args[2].toNumber()}
-                          </Text>
-                        ) : (
-                          ""
-                        )}
-                      </CardBody>
-                    </Card>
-                  )
-                }
-              })
-            })}
-          </Box>
+          {address && <Inventory inventory={inventory} />}
 
           {/* MINT TOKEN */}
-          <Heading my="5" fontFamily="monospace" as="h2">
-            Minting tokens
-          </Heading>
-          {smokeBond && supportTicket && gardenTicket ? (
-            <>
-              <Button
-                me="4"
-                colorScheme="telegram"
-                onClick={() => mint(smokeBond)}
-              >
-                Mint a smoke bond
-              </Button>
-              <Button
-                me="4"
-                colorScheme="telegram"
-                onClick={() => mint(supportTicket)}
-              >
-                Mint a support ticket
-              </Button>
-              <Button
-                me="4"
-                colorScheme="telegram"
-                onClick={() => mint(gardenTicket)}
-              >
-                Mint a garden ticket
-              </Button>
-            </>
-          ) : (
-            <></>
-          )}
+          {address && <Mint address={address} contracts={contracts} />}
 
           {/* PERFORM AN EXCHANGE */}
-          <Heading my="5" fontFamily="monospace" as="h2">
-            Perform an exchange
-          </Heading>
-          <Box justifyContent="space-between" display="flex">
-            <Box maxW="20%">
-              <Text>Give:</Text>
-              <Select bg="white">
-                {inventory.map((nst: OwnedToken) => {
-                  return nst.tokens.map((token: EtherEvent) => {
-                    if (token.args) {
-                      return (
-                        <option
-                          key={token.address + token.args[2].toNumber()}
-                          value=""
-                        >{`${contractName(
-                          token.address
-                        )} (id: ${token.args[2].toNumber()})`}</option>
-                      )
-                    }
-                  })
-                })}
-              </Select>
-            </Box>
-            <Box maxW="20%">
-              <Text>Ask:</Text>
-              <Select bg="white">
-                {inventory.map((nst: OwnedToken) => {
-                  return nst.tokens.map((token: EtherEvent) => {
-                    if (token.args) {
-                      return (
-                        <option
-                          key={token.address + token.args[2].toNumber()}
-                          value=""
-                        >{`${contractName(
-                          token.address
-                        )} (id: ${token.args[2].toNumber()})`}</option>
-                      )
-                    }
-                  })
-                })}
-              </Select>
-            </Box>
-          </Box>
+          {address && (
+            <Exchange
+              contracts={contracts}
+              address={address}
+              inventory={inventory}
+              totalSupply={totalSupply}
+            />
+          )}
         </Container>
       </Box>
     </>
