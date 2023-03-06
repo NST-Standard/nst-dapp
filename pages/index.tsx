@@ -19,7 +19,6 @@ import { useEffect, useState } from "react"
 import { fetchSigner } from "@wagmi/core"
 import { Contract, Event as EtherEvent } from "ethers"
 import Image from "next/image"
-import fetchWithTimeout from "./utils"
 
 type Contracts = {
   smokeBond: null | Contract
@@ -36,6 +35,22 @@ type URIs = {
   title: string
   description: string
   image: string
+}
+
+const fetchWithTimeout = async (
+  ressource: RequestInfo,
+  options = { timeout: 8000 }
+) => {
+  const controller = new AbortController()
+  const id = setTimeout(() => controller.abort(), options.timeout)
+
+  const response = await fetch(ressource, {
+    ...options,
+    signal: controller.signal,
+  })
+  clearTimeout(id)
+
+  return response
 }
 
 const contractName = (contractAddr: string): string => {
