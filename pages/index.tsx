@@ -19,7 +19,7 @@ import { useEffect, useState } from "react"
 import { fetchSigner } from "@wagmi/core"
 import { Contract, Event as EtherEvent } from "ethers"
 import Image from "next/image"
-import { fetchWithTimeout } from "./utils"
+import fetchWithTimeout from "./utils"
 
 type Contracts = {
   smokeBond: null | Contract

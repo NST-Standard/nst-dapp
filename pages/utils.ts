@@ -1,4 +1,4 @@
-export const fetchWithTimeout = async (
+const fetchWithTimeout = async (
   ressource: RequestInfo,
   options = { timeout: 8000 }
 ) => {
@@ -13,3 +13,5 @@ export const fetchWithTimeout = async (
 
   return response
 }
+
+export default fetchWithTimeout
