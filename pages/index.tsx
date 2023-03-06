@@ -6,6 +6,8 @@ import {
   CardBody,
   Container,
   Heading,
+  Select,
+  Spinner,
   Text,
 } from "@chakra-ui/react"
 import jsonContracts from "./contracts.json"
@@ -16,11 +18,93 @@ import { getContract } from "@wagmi/core"
 import { useEffect, useState } from "react"
 import { fetchSigner } from "@wagmi/core"
 import { Contract, Event as EtherEvent } from "ethers"
+import Image from "next/image"
+import { fetchWithTimeout } from "./utils"
 
 type Contracts = {
   smokeBond: null | Contract
   supportTicket: null | Contract
   gardenTicket: null | Contract
+}
+
+interface OwnedToken {
+  tokens: EtherEvent[]
+  metadata: URIs
+}
+
+type URIs = {
+  title: string
+  description: string
+  image: string
+}
+
+const contractName = (contractAddr: string): string => {
+  switch (contractAddr.toLowerCase()) {
+    case "0xbecced78b7a65a0b2464869553fc0a3c2d2db935":
+      return "Smoke Bond"
+    case "0x1ddd12d738acf870de92fd5387d90f3733d50d94":
+      return "Support ticket"
+    case "0x1a48b20bd0f0c89f823686c2270c5404887c287c":
+      return "Garden ticket"
+    default:
+      return "Unknown contract"
+  }
+}
+
+const fetchToken = async (
+  contract: Contract,
+  address: string
+): Promise<OwnedToken> => {
+  const transferFilter = contract.filters.Transfer(
+    null, // from
+    address // to
+  )
+  const tokens = await contract.queryFilter(transferFilter)
+  const metadata = await fetchMetadata(contract)
+
+  return { tokens, metadata }
+}
+
+const fetchMetadata = async (contract: Contract): Promise<URIs> => {
+  const gateway = "https://ipfs.io/ipfs/"
+  let ipfsHash = ""
+  const [uri] = await contract.functions.tokenURI(0)
+  ipfsHash = uri.slice(uri.indexOf("Qm"))
+
+  // fetch metadata
+  let data
+  try {
+    data = await fetchWithTimeout(gateway + ipfsHash, { timeout: 3000 })
+  } catch (e: any) {
+    return {
+      title: "",
+      description: "",
+      image: `Failed to load metadata, IPFS hash: ${ipfsHash}`,
+    }
+  }
+
+  // fetch image
+  const json = await data.json() // metadata
+  ipfsHash = json.image.slice(json.image.indexOf("Qm"))
+  let imgData
+  try {
+    imgData = await fetchWithTimeout(gateway + ipfsHash, { timeout: 3000 })
+  } catch (e: any) {
+    return {
+      title: json.title,
+      description: json.description,
+      image: `Failed to load image, IPFS hash: ${ipfsHash}`,
+    }
+  }
+
+  const blob = await imgData.blob()
+  const src = URL.createObjectURL(blob)
+
+  return {
+    title: json.name,
+    description: json.description,
+    image: src,
+  }
 }
 
 const Home = () => {
@@ -29,7 +113,8 @@ const Home = () => {
   const { disconnect } = useDisconnect()
 
   const [contracts, setContracts] = useState({} as Contracts)
-  const [inventory, setInventory] = useState<EtherEvent[]>([])
+  const { smokeBond, supportTicket, gardenTicket } = contracts
+  const [inventory, setInventory] = useState<OwnedToken[]>([])
 
   // FETCH CONTRACT
   useEffect(() => {
@@ -51,7 +136,7 @@ const Home = () => {
         })
 
         _contracts.gardenTicket = getContract({
-          address: jsonContracts.garderTicket,
+          address: jsonContracts.gardenTicket,
           abi: jsonContracts.abi,
           signerOrProvider: signer,
         })
@@ -64,25 +149,31 @@ const Home = () => {
   // FETCH INVENTORY
   useEffect(() => {
     ;(async () => {
-      if (
-        contracts.smokeBond &&
-        contracts.supportTicket &&
-        contracts.gardenTicket
-      ) {
-        const transferFilter = contracts.smokeBond.filters.Transfer(
-          null, // from
-          address // to
-        )
-        let inventory: EtherEvent[] = []
-        inventory = inventory.concat(
-          await contracts.smokeBond.queryFilter(transferFilter),
-          await contracts.supportTicket.queryFilter(transferFilter),
-          await contracts.gardenTicket.queryFilter(transferFilter)
-        )
+      if (smokeBond && supportTicket && gardenTicket && address) {
+        const inventory: OwnedToken[] = []
+        inventory.push(await fetchToken(supportTicket, address))
+        inventory.push(await fetchToken(gardenTicket, address))
+        inventory.push(await fetchToken(smokeBond, address))
         setInventory(inventory)
       }
     })()
-  }, [contracts, address])
+  }, [smokeBond, supportTicket, gardenTicket, address])
+
+  async function mint(contract: Contract) {
+    let tx
+    console.log("waiting for confirmation")
+    try {
+      tx = await contract["mint(address)"](address)
+    } catch (e) {
+      console.log(e)
+      return
+    }
+
+    console.log("pending")
+    let result = await tx.wait()
+
+    console.log(result)
+  }
 
   return (
     <>
@@ -92,7 +183,11 @@ const Home = () => {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/favicon.ico" />
       </Head>
-      <Box as="main">
+      <Box
+        minH="100vh"
+        bgGradient="linear-gradient(230deg,rgba(200,45,12,.1),rgba(200,245,12,.1))"
+        as="main"
+      >
         <Container fontFamily="monospace" maxW="container.xl">
           <Heading as="h1" fontFamily="monospace" textAlign="center" p="5">
             NST dApp
@@ -121,22 +216,130 @@ const Home = () => {
           <Heading py="5" as="h2" fontFamily="monospace">
             NSTs balances
           </Heading>
-          <Box display="flex">
-            {inventory.map((item: EtherEvent) => {
-              return (
-                <Card m="3" key={item.address + item.blockHash}>
-                  <CardBody>
-                    <Text>Contract: {item.address}</Text>
-
-                    {item.args ? (
-                      <Text>TokenId: {item.args[2].toNumber()}</Text>
-                    ) : (
-                      ""
-                    )}
-                  </CardBody>
-                </Card>
-              )
+          {inventory.length === 0 ? (
+            <>
+              <Spinner />
+            </>
+          ) : (
+            <></>
+          )}
+          <Box display="flex" gap="5">
+            {inventory.map((nst: OwnedToken) => {
+              return nst.tokens.map((token: EtherEvent) => {
+                if (token.args) {
+                  return (
+                    <Card
+                      maxW="20%"
+                      key={token.address + token.args[2].toNumber()}
+                    >
+                      <CardBody display="flex" flexDirection="column">
+                        <Text fontSize="1rem" fontWeight="bold">
+                          {contractName(token.address)}
+                        </Text>
+                        {nst.metadata.image.startsWith("Failed") ? (
+                          <>
+                            <Text>{nst.metadata.image}</Text>
+                          </>
+                        ) : (
+                          <>
+                            <Image
+                              alt={nst.metadata.description}
+                              src={nst.metadata.image}
+                              width="200"
+                              height="200"
+                            />
+                          </>
+                        )}
+                        {token.args ? (
+                          <Text fontWeight="bold" mt="auto">
+                            TokenId: {token.args[2].toNumber()}
+                          </Text>
+                        ) : (
+                          ""
+                        )}
+                      </CardBody>
+                    </Card>
+                  )
+                }
+              })
             })}
+          </Box>
+
+          {/* MINT TOKEN */}
+          <Heading my="5" fontFamily="monospace" as="h2">
+            Minting tokens
+          </Heading>
+          {smokeBond && supportTicket && gardenTicket ? (
+            <>
+              <Button
+                me="4"
+                colorScheme="telegram"
+                onClick={() => mint(smokeBond)}
+              >
+                Mint a smoke bond
+              </Button>
+              <Button
+                me="4"
+                colorScheme="telegram"
+                onClick={() => mint(supportTicket)}
+              >
+                Mint a support ticket
+              </Button>
+              <Button
+                me="4"
+                colorScheme="telegram"
+                onClick={() => mint(gardenTicket)}
+              >
+                Mint a garden ticket
+              </Button>
+            </>
+          ) : (
+            <></>
+          )}
+
+          {/* PERFORM AN EXCHANGE */}
+          <Heading my="5" fontFamily="monospace" as="h2">
+            Perform an exchange
+          </Heading>
+          <Box justifyContent="space-between" display="flex">
+            <Box maxW="20%">
+              <Text>Give:</Text>
+              <Select bg="white">
+                {inventory.map((nst: OwnedToken) => {
+                  return nst.tokens.map((token: EtherEvent) => {
+                    if (token.args) {
+                      return (
+                        <option
+                          key={token.address + token.args[2].toNumber()}
+                          value=""
+                        >{`${contractName(
+                          token.address
+                        )} (id: ${token.args[2].toNumber()})`}</option>
+                      )
+                    }
+                  })
+                })}
+              </Select>
+            </Box>
+            <Box maxW="20%">
+              <Text>Ask:</Text>
+              <Select bg="white">
+                {inventory.map((nst: OwnedToken) => {
+                  return nst.tokens.map((token: EtherEvent) => {
+                    if (token.args) {
+                      return (
+                        <option
+                          key={token.address + token.args[2].toNumber()}
+                          value=""
+                        >{`${contractName(
+                          token.address
+                        )} (id: ${token.args[2].toNumber()})`}</option>
+                      )
+                    }
+                  })
+                })}
+              </Select>
+            </Box>
           </Box>
         </Container>
       </Box>
