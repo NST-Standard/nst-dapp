@@ -14,10 +14,10 @@ import {
   fetchCollections,
   fetchToken,
 } from "@/lib/tokenInventory"
-import Account from "./Account"
-import Inventory from "./Inventory"
-import Mint from "./Mint"
-import Exchange from "./Exchange"
+import Account from "../components/Account"
+import Inventory from "../components/Inventory"
+import Mint from "../components/Mint"
+import Exchange from "../components/Exchange"
 
 const Home = () => {
   const { address, isConnected } = useAccount()
@@ -30,7 +30,7 @@ const Home = () => {
 
   // FETCH CONTRACT and Tokens
   useEffect(() => {
-    ;(async () => {
+    ; (async () => {
       const signer = await fetchSigner()
       if (signer) {
         let _contracts = {} as Contracts
@@ -61,7 +61,7 @@ const Home = () => {
 
   // FETCH INVENTORY
   useEffect(() => {
-    ;(async () => {
+    ; (async () => {
       if (smokeBond && supportTicket && gardenTicket && address) {
         const inventory: Collection[] = []
         inventory.push(await fetchToken(supportTicket, address))
