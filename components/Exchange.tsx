@@ -1,8 +1,19 @@
-import { Collection, contractName, Contracts } from "@/lib/tokenInventory"
-import { Box, Button, Heading, Select, Text } from "@chakra-ui/react"
+import { Collection, getContractName, Contracts } from "@/lib/contractsUtils"
+import {
+  Box,
+  Button,
+  Code,
+  FormControl,
+  FormLabel,
+  Heading,
+  Input,
+  Select,
+  Text,
+} from "@chakra-ui/react"
 import { Contract, ethers, Event as EtherEvent } from "ethers"
 import { useEffect, useState } from "react"
-import { signTypedData } from "@wagmi/core"
+import { signTypedData, getNetwork } from "@wagmi/core"
+import { exchange } from "@/lib/contractInteraction"
 
 type Props = {
   inventory: Collection[]
@@ -39,21 +50,52 @@ const Exchange = ({ inventory, totalSupply, address, contracts }: Props) => {
     useState<SimpleExchange>(initExchangeState)
 
   const [notOwnedSupply, setNotOwnedSupply] = useState<EtherEvent[]>([])
+  const [message, setMessage] = useState({
+    askedTokenAddr: "Asked token address",
+    argument: "Argument",
+    signature: "Signature",
+  })
+
+  const [exchangeInput, setExchangeInput] = useState({
+    askedTokenAddr: "Asked token address",
+    argument: "Argument",
+    signature: "Signature",
+  })
+
+  function getContract(tokenAddr: string): Contract {
+    const { smokeBond, supportTicket, gardenTicket } = contracts
+    if (smokeBond && supportTicket && gardenTicket) {
+      switch (tokenAddr.toLowerCase()) {
+        case smokeBond.address.toLowerCase():
+          return smokeBond
+        case supportTicket.address.toLowerCase():
+          return supportTicket
+        case gardenTicket.address.toLowerCase():
+          return gardenTicket
+        default:
+          throw Error("Unknown token address")
+      }
+    } else {
+      throw Error("Unknown token address")
+    }
+  }
 
   async function signExchange(contract: Contract) {
     // get the nonce on the proper contract
+    const nonce = (await contract.nonce(address)).toNumber()
+    const chainid = getNetwork().chain?.id
     const exchange: SimpleExchange = {
       bid: simpleExchange.bid,
       ask: simpleExchange.ask,
-      message: { owner: address, nonce: 0 },
+      message: { owner: address, nonce },
     }
 
     // get the domain on the proper contract
     const domain = {
       name: await contract.name(),
       version: "1",
-      chainId: 420,
-      verifyingContract: contract.address as `0x${string}`,
+      chainId: chainid,
+      verifyingContract: simpleExchange.bid.tokenAddr as `0x${string}`,
     } as const
 
     const types = {
@@ -90,8 +132,31 @@ const Exchange = ({ inventory, totalSupply, address, contracts }: Props) => {
       },
     } as const
 
+    const argument = ethers.utils.defaultAbiCoder.encode(
+      [
+        "tuple(address,uint256,uint256)",
+        "tuple(address,uint256,uint256)",
+        "tuple(address,uint256)",
+      ],
+      [
+        [value.bid.tokenAddr, value.bid.tokenId, value.bid.amount],
+        [value.ask.tokenAddr, value.ask.tokenId, value.ask.amount],
+        [value.message.owner, value.message.nonce],
+      ]
+    )
+
+    console.table([
+      [value.bid.tokenAddr, value.bid.tokenId, value.bid.amount],
+      [value.ask.tokenAddr, value.ask.tokenId, value.ask.amount],
+      [value.message.owner, value.message.nonce],
+    ])
+
+    console.log(value)
+    console.log(types)
+    console.log(domain)
+
     const signature = await signTypedData({ domain, types, value })
-    console.log(signature)
+    setMessage({ askedTokenAddr: value.ask.tokenAddr, argument, signature })
   }
 
   useEffect(() => {
@@ -126,7 +191,7 @@ const Exchange = ({ inventory, totalSupply, address, contracts }: Props) => {
                   bid: {
                     tokenAddr,
                     tokenId: Number(tokenId),
-                    amount: 0,
+                    amount: 1,
                   },
                 }
               })
@@ -140,7 +205,7 @@ const Exchange = ({ inventory, totalSupply, address, contracts }: Props) => {
                     <option
                       key={token.address + token.args[2].toNumber()}
                       value={[token.address, token.args[2].toNumber()]}
-                    >{`${contractName(
+                    >{`${getContractName(
                       token.address
                     )} (id: ${token.args[2].toNumber()})`}</option>
                   )
@@ -165,7 +230,7 @@ const Exchange = ({ inventory, totalSupply, address, contracts }: Props) => {
                   ask: {
                     tokenAddr,
                     tokenId: Number(tokenId),
-                    amount: 0,
+                    amount: 1,
                   },
                 }
               })
@@ -178,7 +243,7 @@ const Exchange = ({ inventory, totalSupply, address, contracts }: Props) => {
                   <option
                     key={token.address + token.args[2].toNumber()}
                     value={[token.address, token.args[2].toNumber()]}
-                  >{`${contractName(
+                  >{`${getContractName(
                     token.address
                   )} (id: ${token.args[2].toNumber()})`}</option>
                 )
@@ -196,7 +261,7 @@ const Exchange = ({ inventory, totalSupply, address, contracts }: Props) => {
           <Text fontWeight="bold">Token to give</Text>
           {simpleExchange.bid && (
             <>
-              <Text>{contractName(simpleExchange.bid.tokenAddr)}</Text>
+              <Text>{getContractName(simpleExchange.bid.tokenAddr)}</Text>
               <Text>{`TokenId: ${simpleExchange.bid.tokenId}`}</Text>
             </>
           )}
@@ -205,7 +270,7 @@ const Exchange = ({ inventory, totalSupply, address, contracts }: Props) => {
           <Text fontWeight="bold">Token to ask</Text>
           {simpleExchange.ask && (
             <>
-              <Text>{contractName(simpleExchange.ask.tokenAddr)}</Text>
+              <Text>{getContractName(simpleExchange.ask.tokenAddr)}</Text>
               <Text>{`TokenId: ${simpleExchange.ask.tokenId}`}</Text>
             </>
           )}
@@ -221,6 +286,101 @@ const Exchange = ({ inventory, totalSupply, address, contracts }: Props) => {
       ) : (
         <>:</>
       )}
+
+      <Heading my="5" fontFamily="monospace" as="h2">
+        Elements to send
+      </Heading>
+
+      <Text mt="5" fontWeight="bold" fontSize="1.5rem">
+        Asked token address:
+      </Text>
+      <Code maxW="90%" p="1">
+        {message.askedTokenAddr}
+      </Code>
+      <Text mt="5" fontWeight="bold" fontSize="1.5rem">
+        Message argument:
+      </Text>
+      <Code maxW="90%" p="1">
+        {message.argument}
+      </Code>
+      <Text mt="5" fontWeight="bold" fontSize="1.5rem">
+        Signature:
+      </Text>
+      <Code maxW="90%" p="1">
+        {message.signature}
+      </Code>
+
+      <Heading my="5" fontFamily="monospace" as="h2">
+        Execute exchange
+      </Heading>
+
+      <FormControl my="5">
+        <FormLabel>Asked Token address</FormLabel>
+        <Input
+          value={exchangeInput.askedTokenAddr}
+          onChange={(e) =>
+            setExchangeInput((i) => {
+              return { ...i, askedTokenAddr: e.target.value }
+            })
+          }
+          focusBorderColor={
+            exchangeInput.askedTokenAddr.startsWith("0x") &&
+            exchangeInput.askedTokenAddr.length === 42
+              ? "green.500"
+              : "red.500"
+          }
+          bg="white"
+        />
+        <FormLabel>Argument</FormLabel>
+        <Input
+          value={exchangeInput.argument}
+          onChange={(e) =>
+            setExchangeInput((i) => {
+              return { ...i, argument: e.target.value }
+            })
+          }
+          focusBorderColor={
+            exchangeInput.argument.startsWith("0x") ? "green.500" : "red.500"
+          }
+          bg="white"
+        />
+        <FormLabel>Signature</FormLabel>
+        <Input
+          value={exchangeInput.signature}
+          onChange={(e) =>
+            setExchangeInput((i) => {
+              return { ...i, signature: e.target.value }
+            })
+          }
+          focusBorderColor={
+            exchangeInput.signature.startsWith("0x") &&
+            exchangeInput.signature.length === 132
+              ? "green.500"
+              : "red.500"
+          }
+          bg="white"
+        />
+      </FormControl>
+
+      <Button
+        onClick={() =>
+          exchange(
+            getContract(exchangeInput.askedTokenAddr),
+            exchangeInput.argument,
+            exchangeInput.signature
+          )
+        }
+        isDisabled={
+          !exchangeInput.signature.startsWith("0x") ||
+          exchangeInput.signature.length !== 132 ||
+          !exchangeInput.argument.startsWith("0x") ||
+          !exchangeInput.askedTokenAddr.startsWith("0x") ||
+          exchangeInput.askedTokenAddr.length !== 42
+        }
+        colorScheme="purple"
+      >
+        Perform exchange
+      </Button>
     </>
   )
 }

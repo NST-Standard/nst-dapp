@@ -1,7 +1,14 @@
 {
-  "smokeBond": "0xbecced78b7a65a0b2464869553fc0a3c2d2db935",
-  "supportTicket": "0x1ddd12d738acf870de92fd5387d90f3733d50d94",
-  "gardenTicket": "0x1a48b20bd0f0c89f823686c2270c5404887c287c",
+  "31337": {
+    "smokeBond": "0x9fe46736679d2d9a65f0992f2272de9f3c7fa6e0",
+    "supportTicket": "0x5fbdb2315678afecb367f032d93f642f64180aa3",
+    "gardenTicket": "0xe7f1725e7734ce288f8367e1bb143e90bb3f0512"
+  },
+  "420": {
+    "smokeBond": "0xbecced78b7a65a0b2464869553fc0a3c2d2db935",
+    "supportTicket": "0x1ddd12d738acf870de92fd5387d90f3733d50d94",
+    "gardenTicket": "0x1a48b20bd0f0c89f823686c2270c5404887c287c"
+  },
   "abi": [
     {
       "inputs": [

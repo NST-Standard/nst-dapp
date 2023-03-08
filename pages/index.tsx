@@ -1,19 +1,19 @@
 import Head from "next/head"
 import { Box, Container, Heading } from "@chakra-ui/react"
-import jsonContracts from "./contracts.json"
-
+import { Event as EtherEvent } from "ethers"
 import { useAccount } from "wagmi"
-
 import { getContract } from "@wagmi/core"
 import { useEffect, useState } from "react"
-import { fetchSigner } from "@wagmi/core"
-import { Event as EtherEvent } from "ethers"
+import { fetchSigner, getNetwork } from "@wagmi/core"
 import {
   Collection,
   Contracts,
   fetchCollections,
   fetchToken,
-} from "@/lib/tokenInventory"
+  getContractAddress,
+  tokenABI,
+} from "@/lib/contractsUtils"
+
 import Account from "../components/Account"
 import Inventory from "../components/Inventory"
 import Mint from "../components/Mint"
@@ -30,26 +30,27 @@ const Home = () => {
 
   // FETCH CONTRACT and Tokens
   useEffect(() => {
-    ; (async () => {
+    ;(async () => {
       const signer = await fetchSigner()
-      if (signer) {
+      const chain = getNetwork().chain
+      if (signer && chain && (chain.id === 420 || chain.id === 31337)) {
         let _contracts = {} as Contracts
 
         _contracts.smokeBond = getContract({
-          address: jsonContracts.smokeBond,
-          abi: jsonContracts.abi,
+          address: getContractAddress("smokeBond"),
+          abi: tokenABI(),
           signerOrProvider: signer,
         })
 
         _contracts.supportTicket = getContract({
-          address: jsonContracts.supportTicket,
-          abi: jsonContracts.abi,
+          address: getContractAddress("supportTicket"),
+          abi: tokenABI(),
           signerOrProvider: signer,
         })
 
         _contracts.gardenTicket = getContract({
-          address: jsonContracts.gardenTicket,
-          abi: jsonContracts.abi,
+          address: getContractAddress("gardenTicket"),
+          abi: tokenABI(),
           signerOrProvider: signer,
         })
 
@@ -61,7 +62,7 @@ const Home = () => {
 
   // FETCH INVENTORY
   useEffect(() => {
-    ; (async () => {
+    ;(async () => {
       if (smokeBond && supportTicket && gardenTicket && address) {
         const inventory: Collection[] = []
         inventory.push(await fetchToken(supportTicket, address))
@@ -85,7 +86,7 @@ const Home = () => {
         bgGradient="linear-gradient(230deg,rgba(200,45,12,.1),rgba(200,245,12,.1))"
         as="main"
       >
-        <Container fontFamily="monospace" maxW="container.xl">
+        <Container pb="10" fontFamily="monospace" maxW="container.xl">
           <Heading as="h1" fontFamily="monospace" textAlign="center" p="5">
             NST dApp
           </Heading>

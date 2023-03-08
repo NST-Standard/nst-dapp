@@ -1,5 +1,7 @@
 import { Contract, Event as EtherEvent } from "ethers"
+import { getNetwork } from "@wagmi/core"
 import { fetchWithTimeout } from "./utils"
+import jsonContracts from "./contracts.json"
 
 export interface Collection {
   tokens: EtherEvent[]
@@ -18,17 +20,38 @@ export type Contracts = {
   gardenTicket: null | Contract
 }
 
-export const contractName = (contractAddr: string): string => {
-  switch (contractAddr.toLowerCase()) {
-    case "0xbecced78b7a65a0b2464869553fc0a3c2d2db935":
-      return "Smoke Bond"
-    case "0x1ddd12d738acf870de92fd5387d90f3733d50d94":
-      return "Support ticket"
-    case "0x1a48b20bd0f0c89f823686c2270c5404887c287c":
-      return "Garden ticket"
-    default:
-      return "Unknown contract"
+export type ContractsName = "smokeBond" | "supportTicket" | "gardenTicket"
+
+export const tokenABI = () => {
+  return jsonContracts.abi
+}
+
+export const getContractAddress = (contractName: ContractsName): string => {
+  const chain = getNetwork().chain
+  if (chain && (chain.id === 420 || chain.id === 31337)) {
+    return jsonContracts[chain.id][contractName]
+  } else {
+    throw Error(
+      "Not connected or wrong network (available network: 420, 31337)"
+    )
   }
+}
+
+export const getContractName = (contractAddr: string): string => {
+  const chain = getNetwork().chain
+  if (chain && (chain.id === 420 || chain.id === 31337)) {
+    switch (contractAddr.toLowerCase()) {
+      case jsonContracts[chain.id].smokeBond:
+        return "Smoke bond"
+      case jsonContracts[chain.id].supportTicket:
+        return "Support ticket"
+      case jsonContracts[chain.id].gardenTicket:
+        return "Garden ticket"
+      default:
+        return contractAddr
+    }
+  }
+  throw Error("Not connected or wrong network (available network: 420, 31337)")
 }
 
 export const fetchMetadata = async (contract: Contract): Promise<Metadata> => {

@@ -1,5 +1,5 @@
 import { mint } from "@/lib/contractInteraction"
-import { Contracts } from "@/lib/tokenInventory"
+import { Contracts } from "@/lib/contractsUtils"
 import {
   Button,
   FormControl,

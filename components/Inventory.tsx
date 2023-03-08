@@ -1,6 +1,6 @@
 import { Event as EtherEvent } from "ethers"
 import { Box, Card, CardBody, Heading, Spinner, Text } from "@chakra-ui/react"
-import { Collection, contractName } from "@/lib/tokenInventory"
+import { Collection, getContractName } from "@/lib/contractsUtils"
 import Image from "next/image"
 
 type Props = {
@@ -22,7 +22,7 @@ const Inventory = ({ inventory }: Props) => {
                 <Card maxW="20%" key={token.address + token.args[2].toNumber()}>
                   <CardBody display="flex" flexDirection="column">
                     <Text fontSize="1rem" fontWeight="bold">
-                      {contractName(token.address)}
+                      {getContractName(token.address)}
                     </Text>
                     {nst.metadata.image.startsWith("Failed") ? (
                       <>
