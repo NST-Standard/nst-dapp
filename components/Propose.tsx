@@ -19,7 +19,6 @@ import {
   Select,
   Text,
 } from "@chakra-ui/react"
-import { Contract } from "ethers"
 import { useEffect, useState } from "react"
 
 type Props = {
@@ -112,7 +111,7 @@ const Propose = ({ inventory, totalSupply, address, contracts }: Props) => {
                     key={nst.metadata.title}
                     value={getContractAddress(nst.metadata.title as TokensName)}
                   >
-                    {nst.metadata.title}
+                    {getContractName(nst.tokens[0].address)}
                   </option>
                 )
               }
@@ -183,7 +182,7 @@ const Propose = ({ inventory, totalSupply, address, contracts }: Props) => {
                     key={nst.metadata.title}
                     value={getContractAddress(nst.metadata.title as TokensName)}
                   >
-                    {nst.metadata.title}
+                    {getContractName(nst.tokens[0].address)}
                   </option>
                 )
               }

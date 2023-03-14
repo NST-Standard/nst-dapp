@@ -1,4 +1,8 @@
-import { writeContract, prepareWriteContract } from "@wagmi/core"
+import {
+  writeContract,
+  prepareWriteContract,
+  SendTransactionResult,
+} from "@wagmi/core"
 import { Contract, ethers } from "ethers"
 import { Dispatch, SetStateAction } from "react"
 import { tokenABI } from "./contractsUtils"
@@ -12,15 +16,65 @@ export const mint = async (
   toast: Function
 ) => {
   setTxProgression("Waiting for confirmation")
-  let tx
+  let config
+
   try {
-    const config = await prepareWriteContract({
+    config = await prepareWriteContract({
       address: contract.address as `0x${string}`,
       abi: tokenABI(),
       functionName: "mint(address)",
       args: [address],
     })
+  } catch (e) {
+    console.log(e)
+    setTxProgression(undefined)
+    throw Error("Call configuration failed")
+  }
 
+  await _proceedCall(setTxProgression, toast, config)
+}
+
+export const exchange = async (
+  contract: Contract,
+  argument: string,
+  signature: string,
+  setTxProgression: Dispatch<SetStateAction<TxProgression>>,
+  toast: Function
+) => {
+  const [decodedArgs] = ethers.utils.defaultAbiCoder.decode(
+    [
+      "tuple(tuple(address tokenAddr,uint256 tokenId,uint256 amount) bid,tuple(address tokenAddr,uint256 tokenId,uint256 amount) ask, tuple(address owner,uint256 nonce) message)",
+    ],
+    argument
+  )
+
+  setTxProgression("Waiting for confirmation")
+  let config
+
+  try {
+    config = await prepareWriteContract({
+      address: contract.address as `0x${string}`,
+      abi: tokenABI(),
+      functionName:
+        "exchange(((address,uint256,uint256),(address,uint256,uint256),(address,uint256)),bytes)",
+      args: [decodedArgs, signature],
+    })
+  } catch (e) {
+    console.log(e)
+    setTxProgression(undefined)
+    throw Error("Call configuration failed")
+  }
+
+  await _proceedCall(setTxProgression, toast, config)
+}
+
+const _proceedCall = async (
+  setTxProgression: Dispatch<SetStateAction<TxProgression>>,
+  toast: Function,
+  config: any
+) => {
+  let tx: SendTransactionResult
+  try {
     tx = await writeContract(config)
     setTxProgression("Pending")
     toast({
@@ -43,7 +97,6 @@ export const mint = async (
     })
     return
   }
-  // ---
 
   let result = await tx.wait()
   setTxProgression(undefined)
@@ -54,37 +107,4 @@ export const mint = async (
     duration: 9000,
     isClosable: true,
   })
-  console.log(result)
-}
-
-export const exchange = async (
-  contract: Contract,
-  argument: string,
-  signature: string
-) => {
-  const [decodedArgs] = ethers.utils.defaultAbiCoder.decode(
-    [
-      "tuple(tuple(address tokenAddr,uint256 tokenId,uint256 amount) bid,tuple(address tokenAddr,uint256 tokenId,uint256 amount) ask, tuple(address owner,uint256 nonce) message)",
-    ],
-    argument
-  )
-
-  console.log(decodedArgs)
-  console.log(contract)
-
-  let tx
-  console.log("waiting for confirmation")
-  try {
-    tx = await contract[
-      "exchange(((address,uint256,uint256),(address,uint256,uint256),(address,uint256)),bytes)"
-    ](decodedArgs, signature)
-  } catch (e) {
-    console.log(e)
-    return
-  }
-
-  console.log("pending")
-  let result = await tx.wait()
-
-  console.log(result)
 }

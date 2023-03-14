@@ -55,7 +55,6 @@ const Mint = ({ contracts, address }: Props) => {
 
       {smokeBond && supportTicket && gardenTicket && (
         <>
-          <Button onClick={() => console.log(toast)}>log</Button>
           <Button
             me="4"
             isLoading={

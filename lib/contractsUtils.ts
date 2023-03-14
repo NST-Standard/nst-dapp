@@ -2,7 +2,6 @@ import { Contract, ethers, Event as EtherEvent } from "ethers"
 import { getNetwork } from "@wagmi/core"
 import { fetchWithTimeout } from "./utils"
 import jsonContracts from "./contracts.json"
-import { isToken } from "typescript"
 
 export interface Collection {
   tokens: EtherEvent[]
@@ -80,11 +79,11 @@ export const getContractName = (contractAddr: string): string => {
   const chain = getNetwork().chain
   if (chain && (chain.id === 420 || chain.id === 31337)) {
     switch (contractAddr.toLowerCase()) {
-      case jsonContracts[chain.id].smokeBond:
-        return "Smoke bond"
-      case jsonContracts[chain.id].supportTicket:
+      case jsonContracts[chain.id].smokeBond.toLowerCase():
+        return "Cigar credit note"
+      case jsonContracts[chain.id].supportTicket.toLowerCase():
         return "Support ticket"
-      case jsonContracts[chain.id].gardenTicket:
+      case jsonContracts[chain.id].gardenTicket.toLowerCase():
         return "Garden ticket"
       default:
         return contractAddr

@@ -1,4 +1,4 @@
-import { exchange } from "@/lib/contractInteraction"
+import { exchange, TxProgression } from "@/lib/contractInteraction"
 import { Contracts, getContractInstance } from "@/lib/contractsUtils"
 import {
   Button,
@@ -6,6 +6,7 @@ import {
   FormLabel,
   Heading,
   Input,
+  useToast,
 } from "@chakra-ui/react"
 import { useState } from "react"
 
@@ -14,6 +15,8 @@ type Props = {
 }
 
 const Accept = ({ contracts }: Props) => {
+  const toast = useToast()
+  const [txProgression, setTxProgression] = useState<TxProgression>()
   const [exchangeInput, setExchangeInput] = useState({
     askedTokenAddr: "",
     argument: "",
@@ -81,9 +84,16 @@ const Accept = ({ contracts }: Props) => {
           exchange(
             getContractInstance(contracts, exchangeInput.askedTokenAddr),
             exchangeInput.argument,
-            exchangeInput.signature
+            exchangeInput.signature,
+            setTxProgression,
+            toast
           )
         }
+        isLoading={
+          txProgression === "Waiting for confirmation" ||
+          txProgression === "Pending"
+        }
+        loadingText={txProgression}
         isDisabled={
           !exchangeInput.signature.startsWith("0x") ||
           exchangeInput.signature.length !== 132 ||
@@ -91,7 +101,7 @@ const Accept = ({ contracts }: Props) => {
           !exchangeInput.askedTokenAddr.startsWith("0x") ||
           exchangeInput.askedTokenAddr.length !== 42
         }
-        colorScheme="purple"
+        colorScheme="teal"
       >
         Perform exchange
       </Button>

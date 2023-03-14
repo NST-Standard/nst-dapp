@@ -9,7 +9,6 @@ import {
   TabPanels,
   Tabs,
 } from "@chakra-ui/react"
-import { Event as EtherEvent } from "ethers"
 import { useAccount } from "wagmi"
 import { getContract } from "@wagmi/core"
 import { useEffect, useState } from "react"
@@ -26,7 +25,6 @@ import {
 import Account from "../components/Account"
 import Inventory from "../components/Inventory"
 import Mint from "../components/Mint"
-import Exchange from "../components/Exchange"
 import Propose from "@/components/Propose"
 import Accept from "@/components/Accept"
 
