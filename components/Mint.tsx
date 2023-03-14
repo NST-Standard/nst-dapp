@@ -1,4 +1,4 @@
-import { mint } from "@/lib/contractInteraction"
+import { mint, TxProgression } from "@/lib/contractInteraction"
 import { Contracts } from "@/lib/contractsUtils"
 import {
   Button,
@@ -8,6 +8,7 @@ import {
   Input,
   InputGroup,
   InputRightElement,
+  useToast,
 } from "@chakra-ui/react"
 import { useState } from "react"
 
@@ -17,13 +18,15 @@ type Props = {
 }
 
 const Mint = ({ contracts, address }: Props) => {
+  const toast = useToast()
+  const [txProgression, setTxProgression] = useState<TxProgression>()
   const [destination, setDestination] = useState(address)
   const { smokeBond, supportTicket, gardenTicket } = contracts
 
   return (
     <>
       <Heading my="5" fontFamily="monospace" as="h2">
-        Minting tokens
+        Mint tokens
       </Heading>
 
       <FormControl my="5">
@@ -52,27 +55,49 @@ const Mint = ({ contracts, address }: Props) => {
 
       {smokeBond && supportTicket && gardenTicket && (
         <>
+          <Button onClick={() => console.log(toast)}>log</Button>
           <Button
             me="4"
+            isLoading={
+              txProgression === "Waiting for confirmation" ||
+              txProgression === "Pending"
+            }
+            loadingText={txProgression}
             colorScheme="telegram"
             isDisabled={destination.length !== 42}
-            onClick={() => mint(smokeBond, destination)}
+            onClick={() =>
+              mint(smokeBond, destination, setTxProgression, toast)
+            }
           >
             Mint a smoke bond
           </Button>
           <Button
             me="4"
+            isLoading={
+              txProgression === "Waiting for confirmation" ||
+              txProgression === "Pending"
+            }
+            loadingText={txProgression}
             colorScheme="telegram"
             isDisabled={destination.length !== 42}
-            onClick={() => mint(supportTicket, destination)}
+            onClick={() =>
+              mint(supportTicket, destination, setTxProgression, toast)
+            }
           >
             Mint a support ticket
           </Button>
           <Button
             me="4"
+            isLoading={
+              txProgression === "Waiting for confirmation" ||
+              txProgression === "Pending"
+            }
+            loadingText={txProgression}
             colorScheme="telegram"
             isDisabled={destination.length !== 42}
-            onClick={() => mint(gardenTicket, destination)}
+            onClick={() =>
+              mint(gardenTicket, destination, setTxProgression, toast)
+            }
           >
             Mint a garden ticket
           </Button>

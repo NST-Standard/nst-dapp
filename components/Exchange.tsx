@@ -1,4 +1,12 @@
-import { Collection, getContractName, Contracts } from "@/lib/contractsUtils"
+import {
+  Collection,
+  getContractName,
+  ContractsName,
+  Contracts,
+  getContractInstance,
+  getContractAddress,
+  TokensName,
+} from "@/lib/contractsUtils"
 import {
   Box,
   Button,
@@ -8,6 +16,7 @@ import {
   Heading,
   Input,
   Select,
+  Stack,
   Text,
 } from "@chakra-ui/react"
 import { Contract, ethers, Event as EtherEvent } from "ethers"
@@ -17,7 +26,7 @@ import { exchange } from "@/lib/contractInteraction"
 
 type Props = {
   inventory: Collection[]
-  totalSupply: EtherEvent[]
+  totalSupply: Collection[]
   address: string
   contracts: Contracts
 }
@@ -39,21 +48,17 @@ type SimpleExchange = {
   message: Message
 }
 
-const initExchangeState: SimpleExchange = {
-  bid: { tokenAddr: "Token address", tokenId: 0, amount: 0 },
-  ask: { tokenAddr: "Token address", tokenId: 0, amount: 0 },
-  message: { owner: "", nonce: 0 },
-}
-
 const Exchange = ({ inventory, totalSupply, address, contracts }: Props) => {
-  const [simpleExchange, setSimpleExchange] =
-    useState<SimpleExchange>(initExchangeState)
+  const [notOwnedSupply, setNotOwnedSupply] = useState<Collection[]>([])
 
-  const [notOwnedSupply, setNotOwnedSupply] = useState<EtherEvent[]>([])
   const [message, setMessage] = useState({
-    askedTokenAddr: "Asked token address",
-    argument: "Argument",
-    signature: "Signature",
+    struct: {
+      bid: { tokenAddr: "0x", tokenId: 0, amount: 0 },
+      ask: { tokenAddr: "0x", tokenId: 0, amount: 0 },
+      message: { owner: "0x", nonce: 0 },
+    },
+    encodedStruct: "0x",
+    signature: "0x",
   })
 
   const [exchangeInput, setExchangeInput] = useState({
@@ -62,111 +67,111 @@ const Exchange = ({ inventory, totalSupply, address, contracts }: Props) => {
     signature: "Signature",
   })
 
-  function getContract(tokenAddr: string): Contract {
-    const { smokeBond, supportTicket, gardenTicket } = contracts
-    if (smokeBond && supportTicket && gardenTicket) {
-      switch (tokenAddr.toLowerCase()) {
-        case smokeBond.address.toLowerCase():
-          return smokeBond
-        case supportTicket.address.toLowerCase():
-          return supportTicket
-        case gardenTicket.address.toLowerCase():
-          return gardenTicket
-        default:
-          throw Error("Unknown token address")
-      }
-    } else {
-      throw Error("Unknown token address")
-    }
-  }
-
   async function signExchange(contract: Contract) {
-    // get the nonce on the proper contract
-    const nonce = (await contract.nonce(address)).toNumber()
     const chainid = getNetwork().chain?.id
-    const exchange: SimpleExchange = {
-      bid: simpleExchange.bid,
-      ask: simpleExchange.ask,
-      message: { owner: address, nonce },
-    }
+
+    const exchangeData: SimpleExchange = message.struct
+    // get the nonce on the proper contract
+    exchangeData.message.owner = address
+    exchangeData.message.nonce = await contract.nonce(address)
+    exchangeData.bid.amount = 1
+    exchangeData.ask.amount = 1
+    console.log(exchangeData)
 
     // get the domain on the proper contract
     const domain = {
       name: await contract.name(),
       version: "1",
       chainId: chainid,
-      verifyingContract: simpleExchange.bid.tokenAddr as `0x${string}`,
+      verifyingContract: contract.address as `0x${string}`,
     } as const
+    console.log(domain)
 
+    // get the typed structure
+    // EIP712Domain: [
+    //   { name: "name", type: "string" },
+    //   { name: "version", type: "string" },
+    //   { name: "chainId", type: "uint256" },
+    //   { name: "verifyingContract", type: "address" },
+    // ],
     const types = {
-      Token: [
-        { name: "tokenAddr", type: "address" },
-        { name: "tokenId", type: "uint256" },
-        { name: "amount", type: "uint256" },
-      ],
-      Message: [
-        { name: "owner", type: "address" },
-        { name: "nonce", type: "uint256" },
-      ],
       SingleExchange: [
         { name: "bid", type: "Token" },
         { name: "ask", type: "Token" },
         { name: "message", type: "Message" },
       ],
+      Message: [
+        { name: "owner", type: "address" },
+        { name: "nonce", type: "uint256" },
+      ],
+      Token: [
+        { name: "tokenAddr", type: "address" },
+        { name: "tokenId", type: "uint256" },
+        { name: "amount", type: "uint256" },
+      ],
     } as const
 
     const value = {
       bid: {
-        tokenAddr: exchange.bid.tokenAddr as `0x${string}`,
-        tokenId: ethers.BigNumber.from(exchange.bid.tokenId),
-        amount: ethers.BigNumber.from(exchange.bid.amount),
+        tokenAddr: exchangeData.bid.tokenAddr as `0x${string}`,
+        tokenId: ethers.BigNumber.from(exchangeData.bid.tokenId),
+        amount: ethers.BigNumber.from(exchangeData.bid.amount),
       },
       ask: {
-        tokenAddr: exchange.ask.tokenAddr as `0x${string}`,
-        tokenId: ethers.BigNumber.from(exchange.ask.tokenId),
-        amount: ethers.BigNumber.from(exchange.ask.amount),
+        tokenAddr: exchangeData.ask.tokenAddr as `0x${string}`,
+        tokenId: ethers.BigNumber.from(exchangeData.ask.tokenId),
+        amount: ethers.BigNumber.from(exchangeData.ask.amount),
       },
       message: {
-        owner: exchange.message.owner as `0x${string}`,
-        nonce: ethers.BigNumber.from(exchange.message.nonce),
+        owner: exchangeData.message.owner as `0x${string}`,
+        nonce: ethers.BigNumber.from(exchangeData.message.nonce),
       },
-    } as const
+    }
 
-    const argument = ethers.utils.defaultAbiCoder.encode(
+    // sign the struct with domain, types and value
+    const signature = await signTypedData({ domain, types, value })
+
+    // encode parameters
+    const encodedStruct = ethers.utils.defaultAbiCoder.encode(
       [
-        "tuple(address,uint256,uint256)",
-        "tuple(address,uint256,uint256)",
-        "tuple(address,uint256)",
+        "tuple(tuple(address tokenAddr,uint256 tokenId,uint256 amount) bid,tuple(address tokenAddr,uint256 tokenId,uint256 amount) ask, tuple(address owner,uint256 nonce) message)",
       ],
-      [
-        [value.bid.tokenAddr, value.bid.tokenId, value.bid.amount],
-        [value.ask.tokenAddr, value.ask.tokenId, value.ask.amount],
-        [value.message.owner, value.message.nonce],
-      ]
+      [value]
     )
 
-    console.table([
-      [value.bid.tokenAddr, value.bid.tokenId, value.bid.amount],
-      [value.ask.tokenAddr, value.ask.tokenId, value.ask.amount],
-      [value.message.owner, value.message.nonce],
-    ])
-
-    console.log(value)
-    console.log(types)
-    console.log(domain)
-
-    const signature = await signTypedData({ domain, types, value })
-    setMessage({ askedTokenAddr: value.ask.tokenAddr, argument, signature })
+    setMessage((m) => {
+      return { ...m, signature, encodedStruct }
+    })
   }
 
   useEffect(() => {
-    const filtered = totalSupply.filter((token) => {
-      if (token.args) {
-        return token.args[1] !== address
+    const notOwned: Collection[] = []
+
+    totalSupply.forEach((collection) => {
+      const userCollection = inventory.find((userCollection) => {
+        userCollection.metadata.title === collection.metadata.title
+      })
+
+      if (!userCollection) {
+        notOwned.push(collection)
+      } else {
+        notOwned.push({
+          ...collection,
+          tokens: collection.tokens.filter((token) => {
+            let owned = false
+            userCollection.tokens.forEach((userToken) => {
+              if (token.args && userToken.args) {
+                if (userToken.args[2] === token.args[2]) owned = true
+              }
+            })
+            return owned
+          }),
+        })
       }
     })
-    setNotOwnedSupply(filtered)
-  }, [address, totalSupply])
+
+    setNotOwnedSupply(notOwned)
+  }, [address, totalSupply, inventory])
 
   return (
     <>
@@ -174,83 +179,152 @@ const Exchange = ({ inventory, totalSupply, address, contracts }: Props) => {
         Perform an exchange
       </Heading>
 
+      <Button
+        onClick={() => {
+          console.log()
+        }}
+      >
+        Log
+      </Button>
+
       <Box justifyContent="space-between" display="flex">
-        <Box maxW="20%">
-          <Text>Give:</Text>
+        {/* TOKEN TO GIVE */}
+        <FormControl>
+          <FormLabel>Token to give:</FormLabel>
           <Select
-            multiple={true}
-            value={[
-              simpleExchange.bid.tokenAddr,
-              simpleExchange.bid.tokenId.toString(),
-            ]}
-            onChange={(e) => {
-              const [tokenAddr, tokenId] = e.target.value.split(",")
-              setSimpleExchange((s) => {
+            bg="white"
+            onChange={(e) =>
+              setMessage((m) => {
                 return {
-                  ...s,
-                  bid: {
-                    tokenAddr,
-                    tokenId: Number(tokenId),
-                    amount: 1,
+                  ...m,
+                  struct: {
+                    ...m.struct,
+                    bid: { ...m.struct.bid, tokenAddr: e.target.value },
                   },
                 }
               })
-            }}
-            bg="white"
+            }
+            value={message.struct.bid.tokenAddr}
+            placeholder="Contract name"
           >
-            {inventory.map((nst: Collection) => {
-              return nst.tokens.map((token: EtherEvent) => {
+            {inventory.map((nst) => {
+              return (
+                <option
+                  key={nst.metadata.title}
+                  value={getContractAddress(nst.metadata.title as TokensName)}
+                >
+                  {nst.metadata.title}
+                </option>
+              )
+            })}
+          </Select>
+          <FormLabel>Token id:</FormLabel>
+          <Select
+            bg="white"
+            onChange={(e) =>
+              setMessage((m) => {
+                return {
+                  ...m,
+                  struct: {
+                    ...m.struct,
+                    bid: { ...m.struct.bid, tokenId: Number(e.target.value) },
+                  },
+                }
+              })
+            }
+            value={message.struct.bid.tokenId}
+            placeholder="token ID"
+          >
+            {inventory
+              .find((a) => {
+                return (
+                  getContractAddress(a.metadata.title as ContractsName) ===
+                  message.struct.bid.tokenAddr
+                )
+              })
+              ?.tokens.map((token) => {
                 if (token.args) {
                   return (
                     <option
-                      key={token.address + token.args[2].toNumber()}
-                      value={[token.address, token.args[2].toNumber()]}
-                    >{`${getContractName(
-                      token.address
-                    )} (id: ${token.args[2].toNumber()})`}</option>
+                      key={token.args[2]}
+                      value={token.args[2].toNumber()}
+                    >
+                      N°{token.args[2].toNumber()}
+                    </option>
                   )
                 }
-              })
-            })}
+              })}
           </Select>
-        </Box>
-        <Box maxW="20%">
-          <Text>Ask:</Text>
+        </FormControl>
+
+        {/* TOKEN TO ASK */}
+        <FormControl>
+          <FormLabel>Token to ask:</FormLabel>
           <Select
-            multiple={true}
-            value={[
-              simpleExchange.ask.tokenAddr,
-              simpleExchange.ask.tokenId.toString(),
-            ]}
-            onChange={(e) => {
-              const [tokenAddr, tokenId] = e.target.value.split(",")
-              setSimpleExchange((s) => {
+            bg="white"
+            onChange={(e) =>
+              setMessage((m) => {
                 return {
-                  ...s,
-                  ask: {
-                    tokenAddr,
-                    tokenId: Number(tokenId),
-                    amount: 1,
+                  ...m,
+                  struct: {
+                    ...m.struct,
+                    ask: { ...m.struct.ask, tokenAddr: e.target.value },
                   },
                 }
               })
-            }}
-            bg="white"
+            }
+            value={message.struct.ask.tokenAddr}
+            placeholder="Contract name"
           >
-            {notOwnedSupply.map((token: EtherEvent) => {
-              if (token.args) {
-                return (
-                  <option
-                    key={token.address + token.args[2].toNumber()}
-                    value={[token.address, token.args[2].toNumber()]}
-                  >{`${getContractName(
-                    token.address
-                  )} (id: ${token.args[2].toNumber()})`}</option>
-                )
-              }
+            {notOwnedSupply.map((nst) => {
+              return (
+                <option
+                  key={nst.metadata.title}
+                  value={getContractAddress(nst.metadata.title as TokensName)}
+                >
+                  {nst.metadata.title}
+                </option>
+              )
             })}
           </Select>
-        </Box>
+          <FormLabel>Token id:</FormLabel>
+          <Select
+            bg="white"
+            onChange={(e) =>
+              setMessage((m) => {
+                return {
+                  ...m,
+                  struct: {
+                    ...m.struct,
+                    ask: { ...m.struct.ask, tokenId: Number(e.target.value) },
+                  },
+                }
+              })
+            }
+            value={message.struct.ask.tokenId}
+            placeholder="token ID"
+          >
+            {notOwnedSupply
+              .find((a) => {
+                return (
+                  getContractAddress(a.metadata.title as ContractsName) ===
+                  message.struct.ask.tokenAddr
+                )
+              })
+              ?.tokens.map((token) => {
+                if (token.args) {
+                  return (
+                    <option
+                      key={token.args[2]}
+                      value={token.args[2].toNumber()}
+                    >
+                      N°{token.args[2].toNumber()}
+                    </option>
+                  )
+                }
+              })}
+          </Select>
+        </FormControl>
       </Box>
 
       <Heading my="5" fontFamily="monospace" as="h2">
@@ -259,27 +333,29 @@ const Exchange = ({ inventory, totalSupply, address, contracts }: Props) => {
       <Box justifyContent="space-between" gap="3" display="flex">
         <Box borderRadius="10" bg="gray.300" p="5">
           <Text fontWeight="bold">Token to give</Text>
-          {simpleExchange.bid && (
+          {message.struct.bid && (
             <>
-              <Text>{getContractName(simpleExchange.bid.tokenAddr)}</Text>
-              <Text>{`TokenId: ${simpleExchange.bid.tokenId}`}</Text>
+              <Text>{getContractName(message.struct.bid.tokenAddr)}</Text>
+              <Text>{`TokenId: ${message.struct.bid.tokenId}`}</Text>
             </>
           )}
         </Box>
         <Box borderRadius="10" bg="gray.300" p="5">
           <Text fontWeight="bold">Token to ask</Text>
-          {simpleExchange.ask && (
+          {message.struct.ask && (
             <>
-              <Text>{getContractName(simpleExchange.ask.tokenAddr)}</Text>
-              <Text>{`TokenId: ${simpleExchange.ask.tokenId}`}</Text>
+              <Text>{getContractName(message.struct.ask.tokenAddr)}</Text>
+              <Text>{`TokenId: ${message.struct.ask.tokenId}`}</Text>
             </>
           )}
         </Box>
       </Box>
 
-      {contracts.smokeBond ? (
+      {contracts.supportTicket ? (
         <>
-          <Button onClick={() => signExchange(contracts.smokeBond as Contract)}>
+          <Button
+            onClick={() => signExchange(contracts.supportTicket as Contract)}
+          >
             Sign
           </Button>
         </>
@@ -295,13 +371,13 @@ const Exchange = ({ inventory, totalSupply, address, contracts }: Props) => {
         Asked token address:
       </Text>
       <Code maxW="90%" p="1">
-        {message.askedTokenAddr}
+        {message.struct.ask.tokenAddr}
       </Code>
       <Text mt="5" fontWeight="bold" fontSize="1.5rem">
         Message argument:
       </Text>
       <Code maxW="90%" p="1">
-        {message.argument}
+        {message.encodedStruct}
       </Code>
       <Text mt="5" fontWeight="bold" fontSize="1.5rem">
         Signature:
@@ -365,7 +441,7 @@ const Exchange = ({ inventory, totalSupply, address, contracts }: Props) => {
       <Button
         onClick={() =>
           exchange(
-            getContract(exchangeInput.askedTokenAddr),
+            getContractInstance(contracts, exchangeInput.askedTokenAddr),
             exchangeInput.argument,
             exchangeInput.signature
           )
