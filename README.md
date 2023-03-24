@@ -1,38 +1,36 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# NST standard dApp
 
-## Getting Started
+Three contracts has been deployed to illustrate how the standard work, they have relations between each others such as:
 
-First, run the development server:
-
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
+```mermaid
+---
+title: Example NST relation
+---
+classDiagram
+Support Ticket<-->Cat Box : Only one-to-one barter
+Garden Ticket<-->Support Ticket : Multi barter
+Support Ticket<-->Support Ticket : Barter with self
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Optimism goerli
 
-You can start editing the page by modifying `pages/index.tsx`. The page auto-updates as you edit the file.
+Try on the [dApp](https://nst-dapp.vercel.app/)
 
-[API routes](https://nextjs.org/docs/api-routes/introduction) can be accessed on [http://localhost:3000/api/hello](http://localhost:3000/api/hello). This endpoint can be edited in `pages/api/hello.ts`.
+| Token name     | Token address                                                                                                                         | Metadata IPFS hash                             |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| Garden Ticket  | [0xc4770fcb3852f19e69be89baae962698c9b3db86](https://goerli-optimism.etherscan.io/address/0xc4770fcb3852f19e69be89baae962698c9b3db86) | QmQskqBAHB615HAFEzpB1FkEuU5Dy6wZc6JEWUjjvcAQ2k |
+| Support Ticket | [0xb026c8fe5b22cb7eed1caf1457fe57cf9f3e3b8d](https://goerli-optimism.etherscan.io/address/0xb026c8fe5b22cb7eed1caf1457fe57cf9f3e3b8d) | QmQskqBAHB615HAFEzpB1FkEuU5Dy6wZc6JEWUjjvcAQ2k |
+| Cat Box        | [0xf2059ac73323e6f285e472f7ce3b0a38ac66aaf1](https://goerli-optimism.etherscan.io/address/0xf2059ac73323e6f285e472f7ce3b0a38ac66aaf1) | QmPpEkpXsLYqrKbsCE4acEUDcKvg72vBKLVjc1dfvHBAzR |
 
-The `pages/api` directory is mapped to `/api/*`. Files in this directory are treated as [API routes](https://nextjs.org/docs/api-routes/introduction) instead of React pages.
+## Local blockchain
 
-This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
+Run a local blockchain and deploy using Foundry, see these [instructions](https://github.com/NST-Standard/NST-Standard#deploy-on-local-blockchain).
 
-## Learn More
+Then configure Metamask (or others wallet) network with:
 
-To learn more about Next.js, take a look at the following resources:
+- **network name:** LocalHost 8545
+- **new RPC URL:** `http://localhost:8545`
+- **chain ID:** 31337
+- **symbol:** ETH
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+And active "Customize transaction nonce" in advanced parameters.
