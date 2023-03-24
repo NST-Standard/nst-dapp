@@ -17,7 +17,6 @@ import {
   Collection,
   Contracts,
   fetchCollections,
-  fetchToken,
   getContractAddress,
   tokenABI,
 } from "@/lib/contractsUtils"
@@ -27,13 +26,12 @@ import Inventory from "../components/Inventory"
 import Mint from "../components/Mint"
 import Propose from "@/components/Propose"
 import Accept from "@/components/Accept"
+import { syncInventory } from "@/lib/inventoryUtils"
 
 const Home = () => {
   const { address, isConnected } = useAccount()
 
   const [contracts, setContracts] = useState({} as Contracts)
-  const { smokeBond, supportTicket, gardenTicket } = contracts
-
   const [totalSupply, setTotalSupply] = useState<Collection[]>([])
   const [inventory, setInventory] = useState<Collection[]>([])
 
@@ -45,42 +43,65 @@ const Home = () => {
       if (signer && chain && (chain.id === 420 || chain.id === 31337)) {
         let _contracts = {} as Contracts
 
-        _contracts.smokeBond = getContract({
-          address: getContractAddress("smokeBond"),
-          abi: tokenABI(),
+        _contracts.catBox = getContract({
+          address: getContractAddress("catBox"),
+          abi: tokenABI("simple"),
           signerOrProvider: signer,
         })
 
         _contracts.supportTicket = getContract({
           address: getContractAddress("supportTicket"),
-          abi: tokenABI(),
+          abi: tokenABI("multi"),
           signerOrProvider: signer,
         })
 
         _contracts.gardenTicket = getContract({
           address: getContractAddress("gardenTicket"),
-          abi: tokenABI(),
+          abi: tokenABI("multi"),
           signerOrProvider: signer,
+        })
+
+        // add "Transfer" listeners
+        _contracts.catBox.on("Transfer", async (from, to, tokenId) => {
+          if (
+            address &&
+            (address.toLowerCase() == from.toLowerCase() ||
+              address.toLowerCase() == to.toLowerCase())
+          ) {
+            await syncInventory(_contracts, address, setInventory)
+          }
+        })
+        _contracts.supportTicket.on("Transfer", async (from, to, tokenId) => {
+          if (
+            address &&
+            (address.toLowerCase() == from.toLowerCase() ||
+              address.toLowerCase() == to.toLowerCase())
+          ) {
+            await syncInventory(_contracts, address, setInventory)
+          }
+        })
+        _contracts.gardenTicket.on("Transfer", async (from, to, tokenId) => {
+          if (
+            address &&
+            (address.toLowerCase() == from.toLowerCase() ||
+              address.toLowerCase() == to.toLowerCase())
+          ) {
+            await syncInventory(_contracts, address, setInventory)
+          }
         })
 
         setContracts(_contracts)
         setTotalSupply(await fetchCollections(_contracts))
       }
     })()
-  }, [isConnected])
+  }, [isConnected, address])
 
   // FETCH INVENTORY
   useEffect(() => {
     ;(async () => {
-      if (smokeBond && supportTicket && gardenTicket && address) {
-        const inventory: Collection[] = []
-        inventory.push(await fetchToken(supportTicket, address))
-        inventory.push(await fetchToken(gardenTicket, address))
-        inventory.push(await fetchToken(smokeBond, address))
-        setInventory(inventory)
-      }
+      await syncInventory(contracts, address, setInventory)
     })()
-  }, [smokeBond, supportTicket, gardenTicket, address])
+  }, [contracts, address])
 
   return (
     <>
@@ -125,7 +146,7 @@ const Home = () => {
                   borderTopLeftRadius="10"
                   bg="rgb(40,240,40,0.2)"
                 >
-                  Propose an exchange
+                  Propose a barter
                 </Tab>
                 <Tab
                   _selected={{ bg: "none" }}
@@ -133,7 +154,7 @@ const Home = () => {
                   borderTopRightRadius="10"
                   bg="rgb(40,240,40,0.2)"
                 >
-                  Accept an exchange
+                  Accept a barter
                 </Tab>
               </TabList>
               <TabPanels>

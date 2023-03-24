@@ -1,4 +1,4 @@
-import { exchange, TxProgression } from "@/lib/contractInteraction"
+import { barter, barterMulti, TxProgression } from "@/lib/contractInteraction"
 import { Contracts, getContractInstance } from "@/lib/contractsUtils"
 import {
   Button,
@@ -22,10 +22,11 @@ const Accept = ({ contracts }: Props) => {
     argument: "",
     signature: "",
   })
+
   return (
     <>
       <Heading my="5" fontFamily="monospace" as="h2">
-        Fill exchange data
+        Fill barter data
       </Heading>
 
       <FormControl my="5">
@@ -80,15 +81,25 @@ const Accept = ({ contracts }: Props) => {
       </FormControl>
 
       <Button
-        onClick={() =>
-          exchange(
-            getContractInstance(contracts, exchangeInput.askedTokenAddr),
-            exchangeInput.argument,
-            exchangeInput.signature,
-            setTxProgression,
-            toast
-          )
-        }
+        onClick={() => {
+          if (exchangeInput.argument.length > 450) {
+            barterMulti(
+              getContractInstance(contracts, exchangeInput.askedTokenAddr),
+              exchangeInput.argument,
+              exchangeInput.signature,
+              setTxProgression,
+              toast
+            )
+          } else {
+            barter(
+              getContractInstance(contracts, exchangeInput.askedTokenAddr),
+              exchangeInput.argument,
+              exchangeInput.signature,
+              setTxProgression,
+              toast
+            )
+          }
+        }}
         isLoading={
           txProgression === "Waiting for confirmation" ||
           txProgression === "Pending"
@@ -103,7 +114,7 @@ const Accept = ({ contracts }: Props) => {
         }
         colorScheme="teal"
       >
-        Perform exchange
+        Perform {exchangeInput.argument.length > 450 ? "multi" : ""} barter
       </Button>
     </>
   )

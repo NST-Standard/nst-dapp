@@ -12,6 +12,7 @@ export type TxProgression = undefined | "Waiting for confirmation" | "Pending"
 export const mint = async (
   contract: Contract,
   address: string,
+  tokenId: number,
   setTxProgression: Dispatch<SetStateAction<TxProgression>>,
   toast: Function
 ) => {
@@ -21,20 +22,28 @@ export const mint = async (
   try {
     config = await prepareWriteContract({
       address: contract.address as `0x${string}`,
-      abi: tokenABI(),
-      functionName: "mint(address)",
-      args: [address],
+      abi: tokenABI("multi"),
+      functionName: "mint(address,uint256)",
+      args: [address, tokenId],
     })
-  } catch (e) {
-    console.log(e)
+  } catch (e: any) {
+    console.log(e.error)
     setTxProgression(undefined)
-    throw Error("Call configuration failed")
+    toast({
+      title: e.code === 4001 ? "Transaction aborted" : "Transaction failure",
+      description: e.code === 4001 ? e.message : e.error.data.message,
+      status: "error",
+      duration: 9000,
+      isClosable: true,
+    })
   }
 
-  await _proceedCall(setTxProgression, toast, config)
+  if (config) {
+    await _proceedCall(setTxProgression, toast, config)
+  }
 }
 
-export const exchange = async (
+export const barter = async (
   contract: Contract,
   argument: string,
   signature: string,
@@ -43,7 +52,7 @@ export const exchange = async (
 ) => {
   const [decodedArgs] = ethers.utils.defaultAbiCoder.decode(
     [
-      "tuple(tuple(address tokenAddr,uint256 tokenId,uint256 amount) bid,tuple(address tokenAddr,uint256 tokenId,uint256 amount) ask, tuple(address owner,uint256 nonce) message)",
+      "tuple(tuple(address tokenAddr,uint256 tokenId) bid,tuple(address tokenAddr,uint256 tokenId) ask,uint256 nonce,address owner,uint48 deadline)",
     ],
     argument
   )
@@ -54,20 +63,71 @@ export const exchange = async (
   try {
     config = await prepareWriteContract({
       address: contract.address as `0x${string}`,
-      abi: tokenABI(),
+      abi: tokenABI("simple"),
       functionName:
-        "exchange(((address,uint256,uint256),(address,uint256,uint256),(address,uint256)),bytes)",
+        "barter(((address,uint256),(address,uint256),uint256,address,uint48),bytes)",
       args: [decodedArgs, signature],
     })
-  } catch (e) {
+  } catch (e: any) {
     console.log(e)
     setTxProgression(undefined)
-    throw Error("Call configuration failed")
+    toast({
+      title: e.code === 4001 ? "Transaction aborted" : "Transaction failure",
+      description: e.code === 4001 ? e.message : e.error.data.message,
+      status: "error",
+      duration: 9000,
+      isClosable: true,
+    })
   }
 
-  await _proceedCall(setTxProgression, toast, config)
+  if (config) {
+    await _proceedCall(setTxProgression, toast, config)
+  }
 }
 
+export const barterMulti = async (
+  contract: Contract,
+  argument: string,
+  signature: string,
+  setTxProgression: Dispatch<SetStateAction<TxProgression>>,
+  toast: Function
+) => {
+  const [decodedArgs] = ethers.utils.defaultAbiCoder.decode(
+    [
+      "tuple(tuple(address tokenAddr,uint256[] tokenIds) bid,tuple(address tokenAddr,uint256[] tokenIds) ask,uint256 nonce,address owner,uint48 deadline)",
+    ],
+    argument
+  )
+
+  setTxProgression("Waiting for confirmation")
+  let config
+
+  try {
+    config = await prepareWriteContract({
+      address: contract.address as `0x${string}`,
+      abi: tokenABI("multi"),
+      functionName:
+        "barter(((address,uint256[]),(address,uint256[]),uint256,address,uint48),bytes)",
+      args: [decodedArgs, signature],
+    })
+  } catch (e: any) {
+    console.log(e)
+    setTxProgression(undefined)
+    toast({
+      title: e.code === 4001 ? "Transaction aborted" : "Transaction failure",
+      description: e.code === 4001 ? e.message : e.error.data.message,
+      status: "error",
+      duration: 9000,
+      isClosable: true,
+    })
+  }
+
+  if (config) {
+    await _proceedCall(setTxProgression, toast, config)
+  }
+}
+
+// internal
 const _proceedCall = async (
   setTxProgression: Dispatch<SetStateAction<TxProgression>>,
   toast: Function,

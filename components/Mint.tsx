@@ -1,6 +1,7 @@
 import { mint, TxProgression } from "@/lib/contractInteraction"
 import { Contracts } from "@/lib/contractsUtils"
 import {
+  Box,
   Button,
   FormControl,
   FormLabel,
@@ -21,7 +22,8 @@ const Mint = ({ contracts, address }: Props) => {
   const toast = useToast()
   const [txProgression, setTxProgression] = useState<TxProgression>()
   const [destination, setDestination] = useState(address)
-  const { smokeBond, supportTicket, gardenTicket } = contracts
+  const [tokenId, setTokenId] = useState(0)
+  const { catBox, supportTicket, gardenTicket } = contracts
 
   return (
     <>
@@ -29,31 +31,43 @@ const Mint = ({ contracts, address }: Props) => {
         Mint tokens
       </Heading>
 
-      <FormControl my="5">
-        <FormLabel>Mint to:</FormLabel>
-        <InputGroup>
+      <FormControl gap="10" display="flex" my="5">
+        <Box minW="50%">
+          <FormLabel>Mint to:</FormLabel>
+          <InputGroup>
+            <Input
+              focusBorderColor={
+                destination.length === 42 ? "green.500" : "red.500"
+              }
+              onChange={(e) => setDestination(e.target.value)}
+              value={destination}
+              bg="white"
+            />
+            <InputRightElement width="4.5rem">
+              <Button
+                isDisabled={destination === address}
+                colorScheme="green"
+                size="sm"
+                onClick={() => setDestination(address)}
+              >
+                me
+              </Button>
+            </InputRightElement>
+          </InputGroup>
+        </Box>
+        <Box>
+          <FormLabel>Token ID:</FormLabel>
           <Input
-            focusBorderColor={
-              destination.length === 42 ? "green.500" : "red.500"
-            }
-            onChange={(e) => setDestination(e.target.value)}
-            value={destination}
+            type="number"
+            focusBorderColor={tokenId >= 0 ? "green.500" : "red.500"}
+            onChange={(e) => setTokenId(Number(e.target.value))}
+            value={tokenId}
             bg="white"
           />
-          <InputRightElement width="4.5rem">
-            <Button
-              isDisabled={destination === address}
-              colorScheme="green"
-              size="sm"
-              onClick={() => setDestination(address)}
-            >
-              me
-            </Button>
-          </InputRightElement>
-        </InputGroup>
+        </Box>
       </FormControl>
 
-      {smokeBond && supportTicket && gardenTicket && (
+      {catBox && supportTicket && gardenTicket && (
         <>
           <Button
             me="4"
@@ -63,12 +77,12 @@ const Mint = ({ contracts, address }: Props) => {
             }
             loadingText={txProgression}
             colorScheme="telegram"
-            isDisabled={destination.length !== 42}
+            isDisabled={destination.length !== 42 || tokenId < 0}
             onClick={() =>
-              mint(smokeBond, destination, setTxProgression, toast)
+              mint(catBox, destination, tokenId, setTxProgression, toast)
             }
           >
-            Mint a smoke bond
+            Mint a cat box
           </Button>
           <Button
             me="4"
@@ -78,9 +92,9 @@ const Mint = ({ contracts, address }: Props) => {
             }
             loadingText={txProgression}
             colorScheme="telegram"
-            isDisabled={destination.length !== 42}
+            isDisabled={destination.length !== 42 || tokenId < 0}
             onClick={() =>
-              mint(supportTicket, destination, setTxProgression, toast)
+              mint(supportTicket, destination, tokenId, setTxProgression, toast)
             }
           >
             Mint a support ticket
@@ -93,9 +107,9 @@ const Mint = ({ contracts, address }: Props) => {
             }
             loadingText={txProgression}
             colorScheme="telegram"
-            isDisabled={destination.length !== 42}
+            isDisabled={destination.length !== 42 || tokenId < 0}
             onClick={() =>
-              mint(gardenTicket, destination, setTxProgression, toast)
+              mint(gardenTicket, destination, tokenId, setTxProgression, toast)
             }
           >
             Mint a garden ticket

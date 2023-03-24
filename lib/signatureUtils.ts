@@ -1,38 +1,70 @@
 import { getNetwork, signTypedData } from "@wagmi/core"
 import { Contract, ethers } from "ethers"
 
-type ExchangePart = {
+export type Message = {
+  multiBarter: boolean
+  encodedStruct: string
+  signature: string
+}
+
+export type Componant = {
   tokenAddr: string
-  tokenId: Number
-  amount: Number
+  tokenId: number
 }
 
-type Message = {
+export type MultiComponant = {
+  tokenAddr: string
+  tokenIds: number[]
+}
+
+export type BarterTerms = {
+  bid: Componant
+  ask: Componant
+  nonce: number
   owner: string
-  nonce: Number
+  deadline: number
 }
 
-type SimpleExchange = {
-  bid: ExchangePart
-  ask: ExchangePart
-  message: Message
+export type MultiBarterTerms = {
+  bid: MultiComponant
+  ask: MultiComponant
+  nonce: number
+  owner: string
+  deadline: number
 }
 
-type SignatureOutput = {
+export const defaultBarterTerms: BarterTerms = {
+  bid: { tokenAddr: "", tokenId: 0 },
+  ask: { tokenAddr: "", tokenId: 0 },
+  nonce: 0,
+  owner: "",
+  deadline: 0,
+}
+
+export const defaultMultiBarterTerms: MultiBarterTerms = {
+  bid: { tokenAddr: "", tokenIds: [] },
+  ask: { tokenAddr: "", tokenIds: [] },
+  nonce: 0,
+  owner: "",
+  deadline: 0,
+}
+
+export type SignatureOutput = {
   signature: string
   encodedStruct: string
 }
 
-export const signExchangeMessage = async (
+export const signBarterTerms = async (
   contract: Contract,
-  exchangeData: SimpleExchange
+  exchangeData: BarterTerms,
+  toast: Function
 ): Promise<SignatureOutput> => {
   const chain = getNetwork().chain
   if (!chain || (chain.id !== 420 && chain.id !== 31337)) {
     throw Error("Network not supported")
   }
 
-  const nonce = await contract.nonce(exchangeData.message.owner)
+  const nonce = await contract.nonce(exchangeData.owner)
 
   // get the domain on the proper contract
   const domain = {
@@ -43,19 +75,16 @@ export const signExchangeMessage = async (
   } as const
 
   const types = {
-    SingleExchange: [
-      { name: "bid", type: "Token" },
-      { name: "ask", type: "Token" },
-      { name: "message", type: "Message" },
-    ],
-    Message: [
-      { name: "owner", type: "address" },
+    BarterTerms: [
+      { name: "bid", type: "Componant" },
+      { name: "ask", type: "Componant" },
       { name: "nonce", type: "uint256" },
+      { name: "owner", type: "address" },
+      { name: "deadline", type: "uint48" },
     ],
-    Token: [
+    Componant: [
       { name: "tokenAddr", type: "address" },
       { name: "tokenId", type: "uint256" },
-      { name: "amount", type: "uint256" },
     ],
   } as const
 
@@ -63,26 +92,113 @@ export const signExchangeMessage = async (
     bid: {
       tokenAddr: exchangeData.bid.tokenAddr as `0x${string}`,
       tokenId: ethers.BigNumber.from(exchangeData.bid.tokenId),
-      amount: ethers.BigNumber.from(exchangeData.bid.amount),
     },
     ask: {
       tokenAddr: exchangeData.ask.tokenAddr as `0x${string}`,
       tokenId: ethers.BigNumber.from(exchangeData.ask.tokenId),
-      amount: ethers.BigNumber.from(exchangeData.ask.amount),
     },
-    message: {
-      owner: exchangeData.message.owner as `0x${string}`,
-      nonce: ethers.BigNumber.from(exchangeData.message.nonce),
-    },
+    nonce: ethers.BigNumber.from(nonce),
+    owner: exchangeData.owner as `0x${string}`,
+    deadline: exchangeData.deadline,
   }
 
   // sign the struct with domain, types and value
-  const signature = await signTypedData({ domain, types, value })
+  let signature = ""
+  try {
+    signature = await signTypedData({ domain, types, value })
+  } catch (e: any) {
+    console.log(e)
+    toast({
+      title: e.code === 4001 ? "Transaction aborted" : "Transaction failure",
+      description: e.message,
+      status: "error",
+      duration: 9000,
+      isClosable: true,
+    })
+  }
 
   // encode parameters
   const encodedStruct = ethers.utils.defaultAbiCoder.encode(
     [
-      "tuple(tuple(address tokenAddr,uint256 tokenId,uint256 amount) bid,tuple(address tokenAddr,uint256 tokenId,uint256 amount) ask, tuple(address owner,uint256 nonce) message)",
+      "tuple(tuple(address tokenAddr,uint256 tokenId) bid,tuple(address tokenAddr,uint256 tokenId) ask,uint256 nonce,address owner,uint48 deadline)",
+    ],
+    [value]
+  )
+
+  return { signature, encodedStruct }
+}
+
+export const signMultiBarterTerms = async (
+  contract: Contract,
+  exchangeData: MultiBarterTerms,
+  toast: Function
+): Promise<SignatureOutput> => {
+  const chain = getNetwork().chain
+  if (!chain || (chain.id !== 420 && chain.id !== 31337)) {
+    throw Error("Network not supported")
+  }
+
+  const nonce = await contract.nonce(exchangeData.owner)
+
+  // get the domain on the proper contract
+  const domain = {
+    name: await contract.name(),
+    version: "1",
+    chainId: chain.id,
+    verifyingContract: contract.address as `0x${string}`,
+  } as const
+
+  const types = {
+    MultiBarterTerms: [
+      { name: "bid", type: "MultiComponant" },
+      { name: "ask", type: "MultiComponant" },
+      { name: "nonce", type: "uint256" },
+      { name: "owner", type: "address" },
+      { name: "deadline", type: "uint48" },
+    ],
+    MultiComponant: [
+      { name: "tokenAddr", type: "address" },
+      { name: "tokenIds", type: "uint256[]" },
+    ],
+  } as const
+
+  const value = {
+    bid: {
+      tokenAddr: exchangeData.bid.tokenAddr as `0x${string}`,
+      tokenIds: exchangeData.bid.tokenIds.map((id) =>
+        ethers.BigNumber.from(id)
+      ),
+    },
+    ask: {
+      tokenAddr: exchangeData.ask.tokenAddr as `0x${string}`,
+      tokenIds: exchangeData.ask.tokenIds.map((id) =>
+        ethers.BigNumber.from(id)
+      ),
+    },
+    nonce: ethers.BigNumber.from(nonce),
+    owner: exchangeData.owner as `0x${string}`,
+    deadline: exchangeData.deadline,
+  }
+
+  // sign the struct with domain, types and value
+  let signature = ""
+  try {
+    signature = await signTypedData({ domain, types, value })
+  } catch (e: any) {
+    console.log(e)
+    toast({
+      title: e.code === 4001 ? "Transaction aborted" : "Transaction failure",
+      description: e.message,
+      status: "error",
+      duration: 9000,
+      isClosable: true,
+    })
+  }
+
+  // encode parameters
+  const encodedStruct = ethers.utils.defaultAbiCoder.encode(
+    [
+      "tuple(tuple(address tokenAddr,uint256[] tokenIds) bid,tuple(address tokenAddr,uint256[] tokenIds) ask,uint256 nonce,address owner,uint48 deadline)",
     ],
     [value]
   )

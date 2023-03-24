@@ -9,36 +9,43 @@ export interface Collection {
 }
 
 export type Metadata = {
+  tokenName: null | TokensName
   title: string
   description: string
   image: string
 }
 
 export type Contracts = {
-  smokeBond: null | Contract
+  catBox: null | Contract
   supportTicket: null | Contract
   gardenTicket: null | Contract
 }
 
-export type ContractsName = "smokeBond" | "supportTicket" | "gardenTicket"
-export type TokensName =
-  | "Cigar credit note"
+export type ContractsName = "catBox" | "supportTicket" | "gardenTicket"
+export type TokensName = "Cat Box" | "Garden Ticket" | "Support Ticket"
+export type IpfsName =
+  | "Can and the box"
   | "Garden ticket entrance"
   | "Support ticket"
 
-export const tokenABI = () => {
-  return jsonContracts.abi
+export const tokenABI = (type: "simple" | "multi") => {
+  switch (type) {
+    case "simple":
+      return jsonContracts.abis.simple
+    case "multi":
+      return jsonContracts.abis.multi
+  }
 }
 
 export const getContractInstance = (
   contracts: Contracts,
   address: string
 ): Contract => {
-  const { smokeBond, supportTicket, gardenTicket } = contracts
-  if (smokeBond && supportTicket && gardenTicket) {
+  const { catBox, supportTicket, gardenTicket } = contracts
+  if (catBox && supportTicket && gardenTicket) {
     switch (address.toLowerCase()) {
-      case smokeBond.address.toLowerCase():
-        return smokeBond
+      case catBox.address.toLowerCase():
+        return catBox
       case supportTicket.address.toLowerCase():
         return supportTicket
       case gardenTicket.address.toLowerCase():
@@ -56,13 +63,13 @@ export const getContractAddress = (
 ): string => {
   const chain = getNetwork().chain
   switch (contractName) {
-    case "Cigar credit note":
-      contractName = "smokeBond"
+    case "Cat Box":
+      contractName = "catBox"
       break
-    case "Garden ticket entrance":
+    case "Garden Ticket":
       contractName = "gardenTicket"
       break
-    case "Support ticket":
+    case "Support Ticket":
       contractName = "supportTicket"
       break
   }
@@ -75,16 +82,16 @@ export const getContractAddress = (
   }
 }
 
-export const getContractName = (contractAddr: string): string => {
+export const getContractName = (contractAddr: string): TokensName | string => {
   const chain = getNetwork().chain
   if (chain && (chain.id === 420 || chain.id === 31337)) {
     switch (contractAddr.toLowerCase()) {
-      case jsonContracts[chain.id].smokeBond.toLowerCase():
-        return "Cigar credit note"
+      case jsonContracts[chain.id].catBox.toLowerCase():
+        return "Cat Box"
       case jsonContracts[chain.id].supportTicket.toLowerCase():
-        return "Support ticket"
+        return "Support Ticket"
       case jsonContracts[chain.id].gardenTicket.toLowerCase():
-        return "Garden ticket"
+        return "Garden Ticket"
       default:
         return contractAddr
     }
@@ -98,12 +105,20 @@ export const fetchMetadata = async (contract: Contract): Promise<Metadata> => {
   const [uri] = await contract.functions.tokenURI(0)
   ipfsHash = uri.slice(uri.indexOf("Qm"))
 
+  let tokenName = null
+  try {
+    tokenName = await contract.name()
+  } catch (e) {
+    console.warn(e)
+  }
+
   // fetch metadata
   let data
   try {
     data = await fetchWithTimeout(gateway + ipfsHash, { timeout: 3000 })
   } catch (e: any) {
     return {
+      tokenName,
       title: "",
       description: "",
       image: `Failed to load metadata, IPFS hash: ${ipfsHash}`,
@@ -118,6 +133,7 @@ export const fetchMetadata = async (contract: Contract): Promise<Metadata> => {
     imgData = await fetchWithTimeout(gateway + ipfsHash, { timeout: 3000 })
   } catch (e: any) {
     return {
+      tokenName,
       title: json.title,
       description: json.description,
       image: `Failed to load image, IPFS hash: ${ipfsHash}`,
@@ -128,6 +144,7 @@ export const fetchMetadata = async (contract: Contract): Promise<Metadata> => {
   const src = URL.createObjectURL(blob)
 
   return {
+    tokenName,
     title: json.name,
     description: json.description,
     image: src,
@@ -160,14 +177,14 @@ export const fetchToken = async (
 }
 
 export const fetchAllTokens = async ({
-  smokeBond,
+  catBox,
   supportTicket,
   gardenTicket,
 }: Contracts): Promise<EtherEvent[]> => {
   let collections: EtherEvent[] = []
-  if (smokeBond && supportTicket && gardenTicket) {
+  if (catBox && supportTicket && gardenTicket) {
     collections = collections.concat(
-      await smokeBond?.queryFilter("Transfer"),
+      await catBox?.queryFilter("Transfer"),
       await supportTicket?.queryFilter("Transfer"),
       await gardenTicket?.queryFilter("Transfer")
     )
@@ -176,13 +193,13 @@ export const fetchAllTokens = async ({
 }
 
 export const fetchCollections = async ({
-  smokeBond,
+  catBox,
   supportTicket,
   gardenTicket,
 }: Contracts): Promise<Collection[]> => {
   let collections: Collection[] = []
-  if (smokeBond && supportTicket && gardenTicket) {
-    collections.push(await fetchToken(smokeBond, null))
+  if (catBox && supportTicket && gardenTicket) {
+    collections.push(await fetchToken(catBox, null))
     collections.push(await fetchToken(supportTicket, null))
     collections.push(await fetchToken(gardenTicket, null))
   }

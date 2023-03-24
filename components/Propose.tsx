@@ -1,25 +1,25 @@
+import { Collection, Contracts } from "@/lib/contractsUtils"
 import {
-  Collection,
-  Contracts,
-  ContractsName,
-  getContractAddress,
-  getContractInstance,
-  getContractName,
-  TokensName,
-} from "@/lib/contractsUtils"
-import { signExchangeMessage } from "@/lib/signatureUtils"
+  BarterTerms,
+  defaultBarterTerms,
+  defaultMultiBarterTerms,
+  Message,
+  MultiBarterTerms,
+} from "@/lib/signatureUtils"
 import {
   Box,
-  Button,
-  Code,
   Divider,
   FormControl,
   FormLabel,
   Heading,
-  Select,
-  Text,
+  Switch,
+  useToast,
 } from "@chakra-ui/react"
 import { useEffect, useState } from "react"
+import SelectMultiTokenAddr from "./SelectMultiTokenId"
+import SelectTokenAddr from "./SelectTokenAddr"
+import SelectTokenId from "./SelectTokenId"
+import Sign from "./Sign"
 
 type Props = {
   inventory: Collection[]
@@ -31,12 +31,13 @@ type Props = {
 const Propose = ({ inventory, totalSupply, address, contracts }: Props) => {
   const [notOwnedSupply, setNotOwnedSupply] = useState<Collection[]>([])
 
-  const [message, setMessage] = useState({
-    struct: {
-      bid: { tokenAddr: "", tokenId: 0, amount: 0 },
-      ask: { tokenAddr: "", tokenId: 0, amount: 0 },
-      message: { owner: "", nonce: 0 },
-    },
+  const [barterTerms, setBarterTerms] =
+    useState<BarterTerms>(defaultBarterTerms)
+  const [multiBarterTerms, setMultiBarterTerms] = useState<MultiBarterTerms>(
+    defaultMultiBarterTerms
+  )
+  const [message, setMessage] = useState<Message>({
+    multiBarter: false,
     encodedStruct: "",
     signature: "",
   })
@@ -63,245 +64,99 @@ const Propose = ({ inventory, totalSupply, address, contracts }: Props) => {
     setNotOwnedSupply(_notOwnedSupply)
   }, [address, totalSupply, inventory])
 
-  async function sign() {
-    const exchangeData = message.struct
-    exchangeData.message.owner = address
-    exchangeData.bid.amount = 1
-    exchangeData.ask.amount = 1
-    const { signature, encodedStruct } = await signExchangeMessage(
-      getContractInstance(contracts, message.struct.bid.tokenAddr),
-      exchangeData
-    )
-
-    setMessage((m) => {
-      return { ...m, signature, encodedStruct }
-    })
-  }
-
   return (
     <>
-      <Heading my="5" fontFamily="monospace" as="h2">
-        Select token
-      </Heading>
+      <Box display="flex">
+        <Heading minW="20rem" my="5" fontFamily="monospace" as="h2">
+          Select token{message.multiBarter ? "s" : ""}
+        </Heading>
+        <FormControl display="flex" alignItems="center">
+          <FormLabel htmlFor="multi" mb="0">
+            Multi barter
+          </FormLabel>
+          <Switch
+            onChange={() =>
+              setMessage((m) => {
+                return {
+                  ...m,
+                  multiBarter: !m.multiBarter,
+                }
+              })
+            }
+            colorScheme="teal"
+            id="multi"
+          />
+        </FormControl>
+      </Box>
 
       <Box justifyContent="space-between" display="flex">
         {/* TOKEN TO GIVE */}
         <FormControl maxW="35%">
-          <FormLabel>Token to give:</FormLabel>
-          <Select
-            placeholder="Token name"
-            bg="white"
-            onChange={(e) =>
-              setMessage((m) => {
-                return {
-                  ...m,
-                  struct: {
-                    ...m.struct,
-                    bid: { ...m.struct.bid, tokenAddr: e.target.value },
-                  },
-                }
-              })
-            }
-            value={message.struct.bid.tokenAddr}
-          >
-            {inventory.map((nst) => {
-              if (nst.tokens.length) {
-                return (
-                  <option
-                    key={nst.metadata.title}
-                    value={getContractAddress(nst.metadata.title as TokensName)}
-                  >
-                    {getContractName(nst.tokens[0].address)}
-                  </option>
-                )
-              }
-            })}
-          </Select>
-          <FormLabel>Token id:</FormLabel>
-          <Select
-            placeholder="Token ID"
-            bg="white"
-            onChange={(e) =>
-              setMessage((m) => {
-                return {
-                  ...m,
-                  struct: {
-                    ...m.struct,
-                    bid: { ...m.struct.bid, tokenId: Number(e.target.value) },
-                  },
-                }
-              })
-            }
-            value={message.struct.bid.tokenId}
-          >
-            {inventory
-              .find((a) => {
-                return (
-                  getContractAddress(a.metadata.title as ContractsName) ===
-                  message.struct.bid.tokenAddr
-                )
-              })
-              ?.tokens.map((token) => {
-                if (token.args) {
-                  return (
-                    <option
-                      key={token.args[2]}
-                      value={token.args[2].toNumber()}
-                    >
-                      N°{token.args[2].toNumber()}
-                    </option>
-                  )
-                }
-              })}
-          </Select>
+          <SelectTokenAddr
+            multiBarterTerms={multiBarterTerms}
+            setMultiBarterTerms={setMultiBarterTerms}
+            barterTerms={barterTerms}
+            setBarterTerms={setBarterTerms}
+            collectionList={inventory}
+            message={message}
+            barterComponant="bid"
+          />
+          {message.multiBarter ? (
+            <SelectMultiTokenAddr
+              multiBarterTerms={multiBarterTerms}
+              setMultiBarterTerms={setMultiBarterTerms}
+              tokenList={inventory}
+              barterComponant="bid"
+            />
+          ) : (
+            <SelectTokenId
+              barterTerms={barterTerms}
+              setBarterTerms={setBarterTerms}
+              tokenList={inventory}
+              barterComponant="bid"
+            />
+          )}
         </FormControl>
 
         {/* TOKEN TO ASK */}
         <FormControl maxW="35%">
-          <FormLabel>Token to ask:</FormLabel>
-          <Select
-            placeholder="Token name"
-            bg="white"
-            onChange={(e) =>
-              setMessage((m) => {
-                return {
-                  ...m,
-                  struct: {
-                    ...m.struct,
-                    ask: { ...m.struct.ask, tokenAddr: e.target.value },
-                  },
-                }
-              })
-            }
-            value={message.struct.ask.tokenAddr}
-          >
-            {notOwnedSupply.map((nst) => {
-              if (nst.tokens.length) {
-                return (
-                  <option
-                    key={nst.metadata.title}
-                    value={getContractAddress(nst.metadata.title as TokensName)}
-                  >
-                    {getContractName(nst.tokens[0].address)}
-                  </option>
-                )
-              }
-            })}
-          </Select>
-          <FormLabel>Token id:</FormLabel>
-          <Select
-            placeholder="Token ID"
-            bg="white"
-            onChange={(e) =>
-              setMessage((m) => {
-                return {
-                  ...m,
-                  struct: {
-                    ...m.struct,
-                    ask: { ...m.struct.ask, tokenId: Number(e.target.value) },
-                  },
-                }
-              })
-            }
-            value={message.struct.ask.tokenId}
-          >
-            {notOwnedSupply
-              .find((a) => {
-                return (
-                  getContractAddress(a.metadata.title as ContractsName) ===
-                  message.struct.ask.tokenAddr
-                )
-              })
-              ?.tokens.map((token) => {
-                if (token.args) {
-                  return (
-                    <option
-                      key={token.args[2]}
-                      value={token.args[2].toNumber()}
-                    >
-                      N°{token.args[2].toNumber()}
-                    </option>
-                  )
-                }
-              })}
-          </Select>
+          <SelectTokenAddr
+            multiBarterTerms={multiBarterTerms}
+            setMultiBarterTerms={setMultiBarterTerms}
+            barterTerms={barterTerms}
+            setBarterTerms={setBarterTerms}
+            collectionList={notOwnedSupply}
+            message={message}
+            barterComponant="ask"
+          />
+          {message.multiBarter ? (
+            <SelectMultiTokenAddr
+              multiBarterTerms={multiBarterTerms}
+              setMultiBarterTerms={setMultiBarterTerms}
+              tokenList={notOwnedSupply}
+              barterComponant="ask"
+            />
+          ) : (
+            <SelectTokenId
+              barterTerms={barterTerms}
+              setBarterTerms={setBarterTerms}
+              tokenList={notOwnedSupply}
+              barterComponant="ask"
+            />
+          )}
         </FormControl>
       </Box>
 
       <Divider borderColor="black" mt="5" />
-      <Heading my="5" fontFamily="monospace" as="h3">
-        Exchange resume
-      </Heading>
-      <Box
-        textAlign="center"
-        fontSize="2xl"
-        justifyContent="space-between"
-        gap="3"
-        display="flex"
-      >
-        <Box borderRadius="10" bg="gray.300" px="5rem" py="5">
-          <Text fontWeight="bold">Token to give</Text>
-          {message.struct.bid && (
-            <>
-              <Text>{getContractName(message.struct.bid.tokenAddr)}</Text>
-              <Text>{`TokenId: ${message.struct.bid.tokenId}`}</Text>
-            </>
-          )}
-        </Box>
-        {contracts.smokeBond &&
-        contracts.supportTicket &&
-        contracts.gardenTicket ? (
-          <>
-            <Button
-              colorScheme="teal"
-              size="lg"
-              my="auto"
-              isDisabled={
-                message.struct.bid.tokenAddr === message.struct.ask.tokenAddr &&
-                message.struct.bid.tokenId === message.struct.ask.tokenId
-              }
-              onClick={() => sign()}
-            >
-              Sign
-            </Button>
-          </>
-        ) : (
-          <>:</>
-        )}
-        <Box borderRadius="10" bg="gray.300" px="5rem" py="5">
-          <Text fontWeight="bold">Token to ask</Text>
-          {message.struct.ask && (
-            <>
-              <Text>{getContractName(message.struct.ask.tokenAddr)}</Text>
-              <Text>{`TokenId: ${message.struct.ask.tokenId}`}</Text>
-            </>
-          )}
-        </Box>
-      </Box>
 
-      <Divider borderColor="black" mt="5" />
-      <Heading my="5" fontFamily="monospace" as="h2">
-        Elements to send/publish
-      </Heading>
-
-      <Text mt="5" fontWeight="bold" fontSize="1.5rem">
-        Asked token address:
-      </Text>
-      <Code maxW="90%" p="1">
-        {message.struct.ask.tokenAddr}
-      </Code>
-      <Text mt="5" fontWeight="bold" fontSize="1.5rem">
-        Message argument:
-      </Text>
-      <Code maxW="90%" p="1">
-        {message.encodedStruct}
-      </Code>
-      <Text mt="5" fontWeight="bold" fontSize="1.5rem">
-        Signature:
-      </Text>
-      <Code maxW="90%" p="1">
-        {message.signature}
-      </Code>
+      <Sign
+        address={address}
+        contracts={contracts}
+        message={message}
+        setMessage={setMessage}
+        barterTerms={barterTerms}
+        multiBarterTerms={multiBarterTerms}
+      />
     </>
   )
 }
