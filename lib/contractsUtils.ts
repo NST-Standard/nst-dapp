@@ -76,6 +76,7 @@ export const getContractAddress = (
   if (chain && (chain.id === 420 || chain.id === 31337)) {
     return jsonContracts[chain.id][contractName]
   } else {
+    return ""
     throw Error(
       "Not connected or wrong network (available network: 420, 31337)"
     )
@@ -96,7 +97,8 @@ export const getContractName = (contractAddr: string): TokensName | string => {
         return contractAddr
     }
   }
-  throw Error("Not connected or wrong network (available network: 420, 31337)")
+  return contractAddr
+  // throw Error("Not connected or wrong network (available network: 420, 31337)")
 }
 
 export const fetchMetadata = async (contract: Contract): Promise<Metadata> => {

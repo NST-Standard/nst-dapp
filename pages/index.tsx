@@ -1,18 +1,26 @@
 import Head from "next/head"
 import {
   Box,
+  Button,
   Container,
   Heading,
+  Modal,
+  ModalBody,
+  ModalCloseButton,
+  ModalContent,
+  ModalFooter,
+  ModalHeader,
+  ModalOverlay,
   Tab,
   TabList,
   TabPanel,
   TabPanels,
   Tabs,
 } from "@chakra-ui/react"
-import { useAccount } from "wagmi"
+import { useAccount, useDisconnect } from "wagmi"
 import { getContract } from "@wagmi/core"
 import { useEffect, useState } from "react"
-import { fetchSigner, getNetwork } from "@wagmi/core"
+import { fetchSigner, getNetwork, switchNetwork } from "@wagmi/core"
 import {
   Collection,
   Contracts,
@@ -30,6 +38,7 @@ import { syncInventory } from "@/lib/inventoryUtils"
 
 const Home = () => {
   const { address, isConnected } = useAccount()
+  const { disconnect } = useDisconnect()
 
   const [contracts, setContracts] = useState({} as Contracts)
   const [totalSupply, setTotalSupply] = useState<Collection[]>([])
@@ -123,6 +132,42 @@ const Home = () => {
 
           {/* ACCOUNT */}
           <Account />
+
+          <Modal
+            isOpen={
+              address !== undefined &&
+              getNetwork().chain?.id !== 420 &&
+              getNetwork().chain?.id !== 31337
+            }
+            onClose={() => console.log("close")}
+          >
+            <ModalOverlay />
+            <ModalContent border="4px" borderColor="red">
+              <ModalHeader>Network not supported</ModalHeader>
+              <ModalCloseButton />
+              <ModalBody>
+                Only Optimism goerli (420) and local network (31337) supported
+              </ModalBody>
+
+              <ModalFooter>
+                <Button colorScheme="red" mr={3} onClick={() => disconnect()}>
+                  Disconnect
+                </Button>
+                <Button
+                  onClick={async () => {
+                    disconnect()
+                    await switchNetwork({
+                      chainId: 420,
+                    })
+                  }}
+                  colorScheme="green"
+                  variant="outline"
+                >
+                  Switch to Optimism goerli
+                </Button>
+              </ModalFooter>
+            </ModalContent>
+          </Modal>
 
           {/* NST BALANCES */}
           {address && <Inventory inventory={inventory} />}
