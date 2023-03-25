@@ -9,6 +9,7 @@ import {
   Input,
   InputGroup,
   InputRightElement,
+  Text,
   useToast,
 } from "@chakra-ui/react"
 import { useState } from "react"
@@ -27,9 +28,12 @@ const Mint = ({ contracts, address }: Props) => {
 
   return (
     <>
-      <Heading my="5" fontFamily="monospace" as="h2">
+      <Heading mt="5" fontFamily="monospace" as="h2">
         Mint tokens
       </Heading>
+      <Text fontStyle="italic">
+        Mint tokens to several accounts and try to barter them.
+      </Text>
 
       <FormControl gap="10" display="flex" my="5">
         <Box minW="50%">

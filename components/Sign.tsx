@@ -138,7 +138,7 @@ const Sign = ({
           {message.multiBarter ? (
             <>
               {" "}
-              <Text fontWeight="bold">Tokens to give</Text>
+              <Text fontWeight="bold">Tokens to ask</Text>
               <UnorderedList>
                 {multiBarterTerms.ask.tokenIds.map((id) => {
                   return (
@@ -151,7 +151,7 @@ const Sign = ({
             </>
           ) : (
             <>
-              <Text fontWeight="bold">Token to give</Text>
+              <Text fontWeight="bold">Token to ask</Text>
               {barterTerms.ask && (
                 <>
                   <Text>{getContractName(barterTerms.ask.tokenAddr)}</Text>

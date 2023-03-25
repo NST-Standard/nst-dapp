@@ -16,6 +16,7 @@ import {
   TabPanel,
   TabPanels,
   Tabs,
+  Text,
 } from "@chakra-ui/react"
 import { useAccount, useDisconnect } from "wagmi"
 import { getContract } from "@wagmi/core"
@@ -177,45 +178,58 @@ const Home = () => {
 
           {/* PERFORM AN EXCHANGE */}
           {address && (
-            <Tabs
-              borderRadius="10"
-              my="10"
-              bg="blackAlpha.100"
-              isFitted
-              variant="unstyled"
-            >
-              <TabList>
-                <Tab
-                  _selected={{ bg: "none" }}
-                  fontWeight="bold"
-                  borderTopLeftRadius="10"
-                  bg="rgb(40,240,40,0.2)"
-                >
-                  Propose a barter
-                </Tab>
-                <Tab
-                  _selected={{ bg: "none" }}
-                  fontWeight="bold"
-                  borderTopRightRadius="10"
-                  bg="rgb(40,240,40,0.2)"
-                >
-                  Accept a barter
-                </Tab>
-              </TabList>
-              <TabPanels>
-                <TabPanel>
-                  <Propose
-                    contracts={contracts}
-                    address={address}
-                    inventory={inventory}
-                    totalSupply={totalSupply}
-                  />
-                </TabPanel>
-                <TabPanel>
-                  <Accept contracts={contracts} />
-                </TabPanel>
-              </TabPanels>
-            </Tabs>
+            <>
+              <Heading mt="10" fontFamily="monospace" as="h2">
+                Barter tokens
+              </Heading>
+              <Text fontStyle="italic">
+                Propose a barter: select tokens to give and tokens you want,
+                then sign the message and send it to the asked token owner.
+              </Text>
+              <Text fontStyle="italic">
+                Accept a barter: fill the barter data with the proposition
+                output and perform the barter.
+              </Text>
+              <Tabs
+                borderRadius="10"
+                my="5"
+                bg="blackAlpha.100"
+                isFitted
+                variant="unstyled"
+              >
+                <TabList>
+                  <Tab
+                    _selected={{ bg: "none" }}
+                    fontWeight="bold"
+                    borderTopLeftRadius="10"
+                    bg="rgb(40,240,40,0.2)"
+                  >
+                    Propose a barter
+                  </Tab>
+                  <Tab
+                    _selected={{ bg: "none" }}
+                    fontWeight="bold"
+                    borderTopRightRadius="10"
+                    bg="rgb(40,240,40,0.2)"
+                  >
+                    Accept a barter
+                  </Tab>
+                </TabList>
+                <TabPanels>
+                  <TabPanel>
+                    <Propose
+                      contracts={contracts}
+                      address={address}
+                      inventory={inventory}
+                      totalSupply={totalSupply}
+                    />
+                  </TabPanel>
+                  <TabPanel>
+                    <Accept contracts={contracts} />
+                  </TabPanel>
+                </TabPanels>
+              </Tabs>
+            </>
           )}
         </Container>
       </Box>

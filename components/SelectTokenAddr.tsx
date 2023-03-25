@@ -29,7 +29,9 @@ const SelectTokenAddr = ({
 }: Props) => {
   return (
     <>
-      <FormLabel>Token to give:</FormLabel>
+      <FormLabel>
+        Token to {barterComponant === "bid" ? "give" : "ask"}:
+      </FormLabel>
       <Select
         placeholder="Token name"
         bg="white"
